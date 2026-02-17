@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Plus, Hotel } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Download, Plus, Hotel, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import RoomGrid from "@/components/RoomGrid";
 import BookingForm from "@/components/BookingForm";
 import BookingsList from "@/components/BookingsList";
@@ -18,6 +21,7 @@ const Index = () => {
   const [selectedRoom, setSelectedRoom] = useState<string | undefined>();
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
   const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -69,7 +73,7 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">Booking Management</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="h-4 w-4 mr-1" /> CSV
             </Button>
@@ -84,13 +88,38 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Room Grid */}
+        {/* Room Grid with Date Picker */}
         <Card key={`grid-${refreshKey}`}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Rooms & Availability</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <CardTitle className="text-lg">Rooms & Availability</CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Viewing:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(selectedDate, "PPP")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(d) => d && setSelectedDate(d)}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                {selectedDate.toDateString() !== new Date().toDateString() && (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedDate(new Date())}>Today</Button>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <RoomGrid onSelectRoom={handleRoomSelect} />
+            <RoomGrid onSelectRoom={handleRoomSelect} selectedDate={selectedDate} />
           </CardContent>
         </Card>
 
@@ -120,7 +149,7 @@ const Index = () => {
 
       {/* Booking Form Dialog */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) handleFormDone(); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editBooking ? "Edit Booking" : "New Booking"}</DialogTitle>
           </DialogHeader>
