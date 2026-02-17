@@ -24,6 +24,10 @@ export function deleteBooking(id: string): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
 }
 
+export function clearAllBookings(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
 export function exportBookingsJSON(): string {
   return JSON.stringify(getBookings(), null, 2);
 }

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Download, Plus, Hotel, CalendarIcon } from "lucide-react";
+import { Download, Plus, Hotel, CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import RoomGrid from "@/components/RoomGrid";
@@ -12,7 +12,7 @@ import BookingForm from "@/components/BookingForm";
 import BookingsList from "@/components/BookingsList";
 import InvoiceView from "@/components/InvoiceView";
 import { Booking } from "@/lib/types";
-import { exportBookingsJSON, exportBookingsCSV, downloadFile } from "@/lib/bookingStore";
+import { exportBookingsJSON, exportBookingsCSV, downloadFile, clearAllBookings } from "@/lib/bookingStore";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -74,6 +74,15 @@ const Index = () => {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
+            <Button variant="outline" size="sm" onClick={() => {
+              if (confirm("Clear all bookings? This cannot be undone. Export first if needed.")) {
+                clearAllBookings();
+                refresh();
+                toast.success("All bookings cleared!");
+              }
+            }}>
+              <Trash2 className="h-4 w-4 mr-1" /> Clear All
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="h-4 w-4 mr-1" /> CSV
             </Button>
