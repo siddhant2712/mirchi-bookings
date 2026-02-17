@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Booking, ROOMS } from "@/lib/types";
 import { saveBooking, isRoomAvailable } from "@/lib/bookingStore";
+import { getSettings, getRoomRate } from "@/lib/settingsStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,8 +35,18 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
   const [amount, setAmount] = useState(editBooking?.amount?.toString() ?? "");
   const [advance, setAdvance] = useState(editBooking?.advance?.toString() ?? "0");
   const [notes, setNotes] = useState(editBooking?.notes ?? "");
+  const [guestCompanyName, setGuestCompanyName] = useState(editBooking?.guestCompanyName ?? "");
+  const [guestGstNumber, setGuestGstNumber] = useState(editBooking?.guestGstNumber ?? "");
 
   const isEditing = !!editBooking;
+
+  const nights = checkIn && checkOut && checkOut > checkIn
+    ? Math.ceil((checkOut.getTime() - checkIn.getTime()) / 86400000)
+    : 0;
+  const suggestedTotal = !isEditing && nights > 0 && selectedRooms.length > 0
+    ? selectedRooms.reduce((sum, rid) => sum + getRoomRate(rid) * nights, 0)
+    : 0;
+  const currency = getSettings().currency;
 
   const toggleRoom = (roomId: string) => {
     if (isEditing) return; // Can't change room when editing
@@ -70,7 +81,6 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
     }
 
     if (isEditing) {
-      // Single booking update
       const booking: Booking = {
         ...editBooking!,
         guestName,
@@ -81,11 +91,12 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
         amount: parseFloat(amount),
         advance: parseFloat(advance || "0"),
         notes,
+        guestCompanyName: guestCompanyName || undefined,
+        guestGstNumber: guestGstNumber || undefined,
       };
       saveBooking(booking);
       toast.success("Booking updated!");
     } else {
-      // Create one booking per room
       for (const roomId of selectedRooms) {
         const booking: Booking = {
           id: crypto.randomUUID(),
@@ -99,6 +110,8 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
           status: "confirmed",
           createdAt: new Date().toISOString(),
           notes,
+          guestCompanyName: guestCompanyName || undefined,
+          guestGstNumber: guestGstNumber || undefined,
         };
         saveBooking(booking);
       }
@@ -122,6 +135,16 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
         <div className="space-y-2">
           <Label>Phone</Label>
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Company name (for invoice)</Label>
+          <Input value={guestCompanyName} onChange={(e) => setGuestCompanyName(e.target.value)} placeholder="Customer company name" />
+        </div>
+        <div className="space-y-2">
+          <Label>GST number (for invoice)</Label>
+          <Input value={guestGstNumber} onChange={(e) => setGuestGstNumber(e.target.value)} placeholder="Customer GST No." />
         </div>
       </div>
 
@@ -177,6 +200,7 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
         </div>
         <div className="space-y-2">
           <Label>Check-out *</Label>
+          <p className="text-xs text-muted-foreground">Default check-out time: {getSettings().defaultCheckOutTime} (set in Settings)</p>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !checkOut && "text-muted-foreground")}>
@@ -200,11 +224,27 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Total Amount (₹) *{!isEditing && selectedRooms.length > 1 ? ` (split across ${selectedRooms.length} rooms)` : ""}</Label>
-          <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required />
+          <Label>Total Amount ({currency}) *{!isEditing && selectedRooms.length > 1 ? ` (split across ${selectedRooms.length} rooms)` : ""}</Label>
+          {!isEditing && suggestedTotal > 0 && (
+            <p className="text-xs text-muted-foreground">
+              From rates: {selectedRooms.map((rid) => {
+                const r = ROOMS.find((x) => x.id === rid);
+                const rate = getRoomRate(rid);
+                return rate ? `${r?.label} ${currency}${rate}/day` : null;
+              }).filter(Boolean).join(", ")} × {nights} night{nights !== 1 ? "s" : ""} = {currency}{suggestedTotal}
+            </p>
+          )}
+          <Input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder={suggestedTotal > 0 ? String(suggestedTotal) : "0"}
+            onFocus={(e) => { if (!amount && suggestedTotal > 0) setAmount(String(suggestedTotal)); }}
+            required
+          />
         </div>
         <div className="space-y-2">
-          <Label>Advance Paid (₹)</Label>
+          <Label>Advance Paid ({currency})</Label>
           <Input type="number" value={advance} onChange={(e) => setAdvance(e.target.value)} placeholder="0" />
         </div>
       </div>

@@ -82,3 +82,13 @@
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
 }
+
+@layer components {
+  .card-elevated {
+    @apply rounded-xl border border-border/80 bg-card shadow-sm shadow-black/5;
+  }
+  .header-gradient {
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
+    border-bottom: 1px solid hsl(var(--border));
+  }
+}

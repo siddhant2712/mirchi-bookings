@@ -35,7 +35,7 @@ export function exportBookingsJSON(): string {
 export function exportBookingsCSV(): string {
   const bookings = getBookings();
   if (!bookings.length) return "";
-  const headers = ["id", "guestName", "phone", "room", "checkIn", "checkOut", "amount", "advance", "status", "createdAt", "notes"];
+  const headers = ["id", "guestName", "phone", "room", "checkIn", "checkOut", "amount", "advance", "status", "createdAt", "notes", "guestCompanyName", "guestGstNumber"];
   const rows = bookings.map((b) =>
     headers.map((h) => `"${String((b as any)[h] ?? "").replace(/"/g, '""')}"`).join(",")
   );

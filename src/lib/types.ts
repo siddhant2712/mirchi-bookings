@@ -10,6 +10,10 @@ export interface Booking {
   status: "confirmed" | "checked-in" | "checked-out" | "cancelled";
   createdAt: string;
   notes?: string;
+  /** Customer's company name (for invoice) */
+  guestCompanyName?: string;
+  /** Customer's GST number (for invoice) */
+  guestGstNumber?: string;
 }
 
 export const ROOMS = [

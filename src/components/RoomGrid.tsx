@@ -55,16 +55,16 @@ export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) 
           <button
             key={room.id}
             onClick={() => onSelectRoom(room.id)}
-            className={`relative flex flex-col items-center gap-1.5 rounded-lg border-2 p-4 transition-all cursor-pointer ${statusColors[status]}`}
+            className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-5 transition-all cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.02] ${statusColors[status]}`}
           >
             {room.type === "Room" ? (
-              <Bed className="h-7 w-7 text-foreground/70" />
+              <Bed className="h-8 w-8 text-foreground/70" />
             ) : (
-              <PartyPopper className="h-7 w-7 text-foreground/70" />
+              <PartyPopper className="h-8 w-8 text-foreground/70" />
             )}
             <span className="font-bold text-base text-foreground">{room.label}</span>
             {guest && <span className="text-xs text-foreground/60 truncate max-w-full">{guest}</span>}
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
               status === "available" ? "bg-success text-success-foreground" :
               status === "reserved" ? "bg-warning text-warning-foreground" :
               "bg-destructive text-destructive-foreground"
