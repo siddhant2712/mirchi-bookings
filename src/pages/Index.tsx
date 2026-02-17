@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Download, Plus, Hotel, CalendarIcon, LayoutDashboard, Settings, FileText, CalendarDays } from "lucide-react";
+import { Download, Plus, Hotel, CalendarIcon, LayoutDashboard, Settings, FileText, CalendarDays, ListChecks } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import RoomGrid from "@/components/RoomGrid";
@@ -16,7 +16,7 @@ import SettingsMenu from "@/components/SettingsMenu";
 import SimpleInvoiceGenerator from "@/components/SimpleInvoiceGenerator";
 import CalendarView from "@/components/CalendarView";
 import { Booking } from "@/lib/types";
-import { exportBookingsJSON, exportBookingsCSV, downloadFile } from "@/lib/bookingStore";
+import { exportBookingsJSON, exportBookingsCSV, downloadFile, getBookings } from "@/lib/bookingStore";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -27,8 +27,11 @@ const Index = () => {
   const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null);
   const [showSimpleInvoice, setShowSimpleInvoice] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  const switchToBookings = useCallback(() => setActiveTab("bookings"), []);
 
   useEffect(() => {
     window.addEventListener("bookings-updated", refresh);
@@ -65,7 +68,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       {/* Header */}
       <header className="header-gradient sticky top-0 z-10 backdrop-blur-sm">
         <div className="container mx-auto flex items-center justify-between py-4 px-4">
@@ -96,10 +99,13 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full max-w-xl grid-cols-4 h-12 rounded-xl bg-muted/50 p-1.5 shadow-inner">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="bookings" className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4" /> Bookings
             </TabsTrigger>
             <TabsTrigger value="calendar" className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4" /> Calendar
@@ -112,7 +118,7 @@ const Index = () => {
           <TabsContent value="dashboard" className="space-y-6 mt-0">
         {/* Room Grid with Date Picker */}
         <Card key={`grid-${refreshKey}`} className="card-elevated">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 border-b border-border/60 bg-muted/10">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="text-lg font-semibold">Rooms & Availability</CardTitle>
               <div className="flex items-center gap-2">
@@ -145,6 +151,17 @@ const Index = () => {
           </CardContent>
         </Card>
 
+        {/* Quick link to Bookings tab */}
+        <Card
+          className="card-elevated border-dashed cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+          onClick={() => setActiveTab("bookings")}
+        >
+          <CardContent className="py-4 flex items-center justify-between">
+            <span className="text-sm font-medium">Check-in, Check-out & manage bookings</span>
+            <span className="text-xs text-muted-foreground">Click to open →</span>
+          </CardContent>
+        </Card>
+
         {/* Invoice View */}
         {invoiceBooking && (
           <Card className="card-elevated">
@@ -154,19 +171,32 @@ const Index = () => {
           </Card>
         )}
 
-        {/* Bookings Table */}
-        <Card className="card-elevated">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">All Bookings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BookingsList
-              onEdit={handleEdit}
-              onInvoice={setInvoiceBooking}
-              refreshKey={refreshKey}
-            />
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="bookings" className="mt-0">
+            <Card className="card-elevated overflow-hidden">
+              <CardHeader className="pb-3 bg-muted/20 border-b border-border/60">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary">
+                      <CalendarDays className="h-4 w-4" />
+                    </span>
+                    All Bookings
+                  </CardTitle>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    {refreshKey >= 0 && getBookings().length} total
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <BookingsList
+                  onEdit={handleEdit}
+                  onInvoice={setInvoiceBooking}
+                  onCheckInOut={switchToBookings}
+                  refreshKey={refreshKey}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-0">
