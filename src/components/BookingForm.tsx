@@ -4,8 +4,13 @@ import { saveBooking, isRoomAvailable } from "@/lib/bookingStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface BookingFormProps {
@@ -17,44 +22,93 @@ interface BookingFormProps {
 export default function BookingForm({ initialRoom, editBooking, onDone }: BookingFormProps) {
   const [guestName, setGuestName] = useState(editBooking?.guestName ?? "");
   const [phone, setPhone] = useState(editBooking?.phone ?? "");
-  const [room, setRoom] = useState(editBooking?.room ?? initialRoom ?? "101");
-  const [checkIn, setCheckIn] = useState(editBooking?.checkIn ?? new Date().toISOString().split("T")[0]);
-  const [checkOut, setCheckOut] = useState(editBooking?.checkOut ?? "");
+  const [selectedRooms, setSelectedRooms] = useState<string[]>(
+    editBooking ? [editBooking.room] : initialRoom ? [initialRoom] : []
+  );
+  const [checkIn, setCheckIn] = useState<Date | undefined>(
+    editBooking?.checkIn ? new Date(editBooking.checkIn) : new Date()
+  );
+  const [checkOut, setCheckOut] = useState<Date | undefined>(
+    editBooking?.checkOut ? new Date(editBooking.checkOut) : undefined
+  );
   const [amount, setAmount] = useState(editBooking?.amount?.toString() ?? "");
   const [advance, setAdvance] = useState(editBooking?.advance?.toString() ?? "0");
   const [notes, setNotes] = useState(editBooking?.notes ?? "");
 
+  const isEditing = !!editBooking;
+
+  const toggleRoom = (roomId: string) => {
+    if (isEditing) return; // Can't change room when editing
+    setSelectedRooms((prev) =>
+      prev.includes(roomId) ? prev.filter((r) => r !== roomId) : [...prev, roomId]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestName || !checkIn || !checkOut || !amount) {
-      toast.error("Please fill all required fields");
+    if (!guestName || !checkIn || !checkOut || !amount || selectedRooms.length === 0) {
+      toast.error("Please fill all required fields and select at least one room");
       return;
     }
-    if (new Date(checkOut) <= new Date(checkIn)) {
+    if (checkOut <= checkIn) {
       toast.error("Check-out must be after check-in");
       return;
     }
-    if (!isRoomAvailable(room, checkIn, checkOut, editBooking?.id)) {
-      toast.error("Room not available for selected dates");
-      return;
+
+    const checkInStr = format(checkIn, "yyyy-MM-dd");
+    const checkOutStr = format(checkOut, "yyyy-MM-dd");
+    const perRoomAmount = parseFloat(amount) / selectedRooms.length;
+    const perRoomAdvance = parseFloat(advance || "0") / selectedRooms.length;
+
+    // Check availability for all selected rooms
+    for (const roomId of selectedRooms) {
+      if (!isRoomAvailable(roomId, checkInStr, checkOutStr, editBooking?.id)) {
+        const label = ROOMS.find((r) => r.id === roomId)?.label ?? roomId;
+        toast.error(`${label} is not available for selected dates`);
+        return;
+      }
     }
 
-    const booking: Booking = {
-      id: editBooking?.id ?? crypto.randomUUID(),
-      guestName,
-      phone,
-      room,
-      checkIn,
-      checkOut,
-      amount: parseFloat(amount),
-      advance: parseFloat(advance || "0"),
-      status: editBooking?.status ?? "confirmed",
-      createdAt: editBooking?.createdAt ?? new Date().toISOString(),
-      notes,
-    };
+    if (isEditing) {
+      // Single booking update
+      const booking: Booking = {
+        ...editBooking!,
+        guestName,
+        phone,
+        room: selectedRooms[0],
+        checkIn: checkInStr,
+        checkOut: checkOutStr,
+        amount: parseFloat(amount),
+        advance: parseFloat(advance || "0"),
+        notes,
+      };
+      saveBooking(booking);
+      toast.success("Booking updated!");
+    } else {
+      // Create one booking per room
+      for (const roomId of selectedRooms) {
+        const booking: Booking = {
+          id: crypto.randomUUID(),
+          guestName,
+          phone,
+          room: roomId,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          amount: selectedRooms.length === 1 ? parseFloat(amount) : Math.round(perRoomAmount),
+          advance: selectedRooms.length === 1 ? parseFloat(advance || "0") : Math.round(perRoomAdvance),
+          status: "confirmed",
+          createdAt: new Date().toISOString(),
+          notes,
+        };
+        saveBooking(booking);
+      }
+      toast.success(
+        selectedRooms.length > 1
+          ? `${selectedRooms.length} rooms booked for ${guestName}!`
+          : "Booking created!"
+      );
+    }
 
-    saveBooking(booking);
-    toast.success(editBooking ? "Booking updated!" : "Booking created!");
     onDone();
   };
 
@@ -69,27 +123,84 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
           <Label>Phone</Label>
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
         </div>
-        <div className="space-y-2">
-          <Label>Room *</Label>
-          <Select value={room} onValueChange={setRoom}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ROOMS.map((r) => (
-                <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+
+      {/* Room selection */}
+      <div className="space-y-2">
+        <Label>{isEditing ? "Room" : "Select Rooms *"}</Label>
+        {isEditing ? (
+          <p className="text-sm text-muted-foreground">{ROOMS.find((r) => r.id === selectedRooms[0])?.label}</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {ROOMS.map((room) => (
+              <label
+                key={room.id}
+                className={cn(
+                  "flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors text-sm",
+                  selectedRooms.includes(room.id)
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <Checkbox
+                  checked={selectedRooms.includes(room.id)}
+                  onCheckedChange={() => toggleRoom(room.id)}
+                />
+                {room.label}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Date pickers */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Check-in *</Label>
-          <Input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} required />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !checkIn && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {checkIn ? format(checkIn, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={checkIn}
+                onSelect={setCheckIn}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2">
           <Label>Check-out *</Label>
-          <Input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} required />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !checkOut && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {checkOut ? format(checkOut, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={checkOut}
+                onSelect={setCheckOut}
+                disabled={(date) => checkIn ? date <= checkIn : false}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Total Amount (₹) *</Label>
+          <Label>Total Amount (₹) *{!isEditing && selectedRooms.length > 1 ? ` (split across ${selectedRooms.length} rooms)` : ""}</Label>
           <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required />
         </div>
         <div className="space-y-2">
@@ -97,13 +208,15 @@ export default function BookingForm({ initialRoom, editBooking, onDone }: Bookin
           <Input type="number" value={advance} onChange={(e) => setAdvance(e.target.value)} placeholder="0" />
         </div>
       </div>
+
       <div className="space-y-2">
         <Label>Notes</Label>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special requests..." rows={2} />
       </div>
+
       <div className="flex gap-3 justify-end">
         <Button type="button" variant="outline" onClick={onDone}>Cancel</Button>
-        <Button type="submit">{editBooking ? "Update Booking" : "Book Now"}</Button>
+        <Button type="submit">{isEditing ? "Update Booking" : selectedRooms.length > 1 ? `Book ${selectedRooms.length} Rooms` : "Book Now"}</Button>
       </div>
     </form>
   );

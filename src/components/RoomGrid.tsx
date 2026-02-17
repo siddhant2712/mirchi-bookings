@@ -4,11 +4,14 @@ import { Bed, PartyPopper } from "lucide-react";
 
 interface RoomGridProps {
   onSelectRoom: (roomId: string) => void;
+  selectedDate?: Date;
 }
 
-export default function RoomGrid({ onSelectRoom }: RoomGridProps) {
+export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) {
   const bookings = getBookings();
-  const today = new Date().toISOString().split("T")[0];
+  const targetDate = selectedDate
+    ? selectedDate.toISOString().split("T")[0]
+    : new Date().toISOString().split("T")[0];
 
   const getStatus = (roomId: string) => {
     const active = bookings.find(
@@ -16,18 +19,31 @@ export default function RoomGrid({ onSelectRoom }: RoomGridProps) {
         b.room === roomId &&
         b.status !== "checked-out" &&
         b.status !== "cancelled" &&
-        b.checkIn <= today &&
-        b.checkOut > today
+        b.checkIn <= targetDate &&
+        b.checkOut > targetDate
     );
     if (active?.status === "checked-in") return "occupied";
     if (active?.status === "confirmed") return "reserved";
     return "available";
   };
 
+  const getGuestName = (roomId: string) => {
+    const active = bookings.find(
+      (b) =>
+        b.room === roomId &&
+        b.status !== "checked-out" &&
+        b.status !== "cancelled" &&
+        b.checkIn <= targetDate &&
+        b.checkOut > targetDate
+    );
+    return active?.guestName;
+  };
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
       {ROOMS.map((room) => {
         const status = getStatus(room.id);
+        const guest = getGuestName(room.id);
         const statusColors = {
           available: "bg-success/10 border-success/30 hover:border-success",
           reserved: "bg-warning/10 border-warning/30 hover:border-warning",
@@ -39,14 +55,15 @@ export default function RoomGrid({ onSelectRoom }: RoomGridProps) {
           <button
             key={room.id}
             onClick={() => onSelectRoom(room.id)}
-            className={`relative flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all cursor-pointer ${statusColors[status]}`}
+            className={`relative flex flex-col items-center gap-1.5 rounded-lg border-2 p-4 transition-all cursor-pointer ${statusColors[status]}`}
           >
             {room.type === "Room" ? (
-              <Bed className="h-8 w-8 text-foreground/70" />
+              <Bed className="h-7 w-7 text-foreground/70" />
             ) : (
-              <PartyPopper className="h-8 w-8 text-foreground/70" />
+              <PartyPopper className="h-7 w-7 text-foreground/70" />
             )}
-            <span className="font-bold text-lg text-foreground">{room.label}</span>
+            <span className="font-bold text-base text-foreground">{room.label}</span>
+            {guest && <span className="text-xs text-foreground/60 truncate max-w-full">{guest}</span>}
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
               status === "available" ? "bg-success text-success-foreground" :
               status === "reserved" ? "bg-warning text-warning-foreground" :
