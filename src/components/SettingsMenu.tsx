@@ -24,6 +24,8 @@ export default function SettingsMenu() {
   const [settings, setSettings] = useState<AppSettings>(getSettings());
   const [revenueFrom, setRevenueFrom] = useState<string>("");
   const [revenueTo, setRevenueTo] = useState<string>("");
+  const [Cgst, setCgst] = useState<string>("");
+  const [Sgst, setSgst] = useState<string>("");
 
   useEffect(() => {
     setSettings(getSettings());
@@ -219,17 +221,48 @@ export default function SettingsMenu() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Tax rate (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                value={settings.taxRatePercent}
-                onChange={(e) => update({ taxRatePercent: parseFloat(e.target.value) || 0 })}
-                className="w-24"
-              />
-            </div>
+  <Label>CGST (%)</Label>
+  <Input
+    type="number"
+    min={0}
+    max={100}
+    step={0.01}
+    value={settings.cgstPercent}
+    onChange={(e) =>
+      update({
+        cgstPercent: parseFloat(e.target.value) || 0,
+      })
+    }
+    className="w-24"
+  />
+
+  <Label>SGST (%)</Label>
+  <Input
+    type="number"
+    min={0}
+    max={100}
+    step={0.01}
+    value={settings.sgstPercent}
+    onChange={(e) =>
+      update({
+        sgstPercent: parseFloat(e.target.value) || 0,
+      })
+    }
+    className="w-24"
+  />
+
+  <Label>Total Tax (%)</Label>
+  <Input
+    type="number"
+    value={
+      (settings.cgstPercent || 0) +
+      (settings.sgstPercent || 0)
+    }
+    readOnly
+    className="w-24 bg-gray-100"
+  />
+</div>
+
           </div>
         </CardContent>
       </Card>
