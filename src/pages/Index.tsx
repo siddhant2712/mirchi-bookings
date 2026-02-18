@@ -56,15 +56,16 @@ const Index = () => {
   const [showSimpleInvoice, setShowSimpleInvoice] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [timelineOption, setTimelineOption] = useState<
+    "today" | "yesterday" | "custom"
+  >("today");
+  const [customStart, setCustomStart] = useState<Date | null>(null);
+  const [customEnd, setCustomEnd] = useState<Date | null>(null);
+  const [showTimelineDialog, setShowTimelineDialog] = useState(false);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   const switchToBookings = useCallback(() => setActiveTab("bookings"), []);
-
-  useEffect(() => {
-    window.addEventListener("bookings-updated", refresh);
-    return () => window.removeEventListener("bookings-updated", refresh);
-  }, [refresh]);
 
   const handleRoomSelect = (roomId: string) => {
     setSelectedRoom(roomId);
@@ -85,14 +86,10 @@ const Index = () => {
     refresh();
   };
 
-  const handleExportJSON = () => {
-    downloadFile(
-      exportBookingsJSON(),
-      "mirchi-bookings.json",
-      "application/json",
-    );
-    toast.success("JSON downloaded!");
-  };
+  useEffect(() => {
+    window.addEventListener("bookings-updated", refresh);
+    return () => window.removeEventListener("bookings-updated", refresh);
+  }, [refresh]);
 
   const handleExportPDF = () => {
     const allBookings = getBookings();
@@ -100,39 +97,34 @@ const Index = () => {
       toast.error("No bookings to export");
       return;
     }
-    const startInput = window.prompt(
-      "Enter start date for timeline (DD/MM/YYYY or YYYY-MM-DD)",
-    );
-    if (startInput === null) return;
-    const endInput = window.prompt(
-      "Enter end date for timeline (DD/MM/YYYY or YYYY-MM-DD)",
-    );
-    if (endInput === null) return;
 
-    function parseDateInput(str: string): Date | null {
-      const s = str.trim();
-      if (!s) return null;
-      if (s.includes("/")) {
-        const parts = s.split("/").map((p) => parseInt(p, 10));
-        if (parts.length === 3) {
-          // assume DD/MM/YYYY
-          const [d, m, y] = parts;
-          return new Date(y, m - 1, d);
-        }
+    let startDate: Date;
+    let endDate: Date;
+
+    if (timelineOption === "today") {
+      startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+    } else if (timelineOption === "yesterday") {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date();
+      endDate.setDate(endDate.getDate() - 1);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // custom
+      if (!customStart || !customEnd) {
+        setShowTimelineDialog(true);
+        toast.info("Choose custom start/end dates");
+        return;
       }
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? null : d;
+      startDate = new Date(customStart);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(customEnd);
+      endDate.setHours(23, 59, 59, 999);
     }
-
-    const startDate = parseDateInput(startInput);
-    const endDate = parseDateInput(endInput);
-    if (!startDate || !endDate) {
-      toast.error("Invalid date(s) provided");
-      return;
-    }
-    // normalize time to start/end of day
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
 
     const filtered = allBookings.filter((b) => {
       const ci = new Date(b.checkIn);
@@ -149,7 +141,7 @@ const Index = () => {
     const s = getSettings();
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text(s.businessName.replace(/[^\x00-\x7F]/g, ""), 14, 18);
+    doc.text(s.businessName.replace(/[^\\x00-\\x7F]/g, ""), 14, 18);
     doc.setFontSize(11);
     doc.setTextColor(100);
     const startLabel = startDate.toLocaleDateString("en-IN");
@@ -200,6 +192,15 @@ const Index = () => {
       `mirchi-bookings-${startLabel.replace(/\//g, "-")}_to_${endLabel.replace(/\//g, "-")}.pdf`,
     );
     toast.success("PDF downloaded!");
+  };
+
+  const handleExportJSON = () => {
+    downloadFile(
+      exportBookingsJSON(),
+      "mirchi-bookings.json",
+      "application/json",
+    );
+    toast.success("JSON downloaded!");
   };
 
   const handleClearAll = () => {
@@ -265,6 +266,48 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      {/* Timeline selector box (appears at top of page) */}
+      <div className="container mx-auto px-4 py-3">
+        <div className="bg-muted/10 border rounded-lg p-3 flex items-center gap-4">
+          <div className="text-sm font-medium">Export timeline:</div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={timelineOption === "today" ? undefined : "outline"}
+              onClick={() => setTimelineOption("today")}
+            >
+              Today
+            </Button>
+            <Button
+              size="sm"
+              variant={timelineOption === "yesterday" ? undefined : "outline"}
+              onClick={() => setTimelineOption("yesterday")}
+            >
+              Yesterday
+            </Button>
+            <Button
+              size="sm"
+              variant={timelineOption === "custom" ? undefined : "outline"}
+              onClick={() => {
+                setTimelineOption("custom");
+                setShowTimelineDialog(true);
+              }}
+            >
+              Custom
+            </Button>
+          </div>
+          <div className="ml-auto text-sm text-muted-foreground">
+            {timelineOption === "today" && format(new Date(), "PPP")}
+            {timelineOption === "yesterday" &&
+              format(new Date(Date.now() - 86400000), "PPP")}
+            {timelineOption === "custom" &&
+              (customStart && customEnd
+                ? `${format(customStart, "PPP")} — ${format(customEnd, "PPP")}`
+                : "No custom range")}
+          </div>
+        </div>
+      </div>
 
       <main className="container mx-auto px-4 py-6">
         <Tabs
@@ -412,6 +455,55 @@ const Index = () => {
             <DialogTitle>Simple Invoice Generator</DialogTitle>
           </DialogHeader>
           <SimpleInvoiceGenerator onClose={() => setShowSimpleInvoice(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom timeline dialog for PDF export */}
+      <Dialog open={showTimelineDialog} onOpenChange={setShowTimelineDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Choose timeline</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 p-2">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Start date</p>
+              <Calendar
+                mode="single"
+                selected={customStart ?? undefined}
+                onSelect={(d) => d && setCustomStart(d)}
+              />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">End date</p>
+              <Calendar
+                mode="single"
+                selected={customEnd ?? undefined}
+                onSelect={(d) => d && setCustomEnd(d)}
+              />
+            </div>
+          </div>
+          <div className="p-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTimelineDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!customStart || !customEnd) {
+                  toast.error("Please pick start and end dates");
+                  return;
+                }
+                setShowTimelineDialog(false);
+                setTimelineOption("custom");
+              }}
+            >
+              Apply
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

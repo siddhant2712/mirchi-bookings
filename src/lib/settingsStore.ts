@@ -1,3 +1,5 @@
+import { getItem, setItem, removeItem } from "./idbStorage";
+
 const STORAGE_KEY = "mirchi-hotel-settings";
 
 export interface RoomConfig {
@@ -8,6 +10,8 @@ export interface RoomConfig {
 
 export interface AppSettings {
   defaultCheckOutTime: string;
+  /** Default check-in time for bookings */
+  defaultCheckInTime: string;
   businessName: string;
   invoiceTitle: string;
   invoiceFooter: string;
@@ -46,6 +50,7 @@ export const DEFAULT_ROOMS: RoomConfig[] = [
 
 const defaults: AppSettings = {
   defaultCheckOutTime: "11:00",
+  defaultCheckInTime: "14:00",
   businessName: "🌶️ Mirchi Hotel",
   invoiceTitle: "Tax Invoice",
   invoiceFooter: "Thank you for staying with us! 🌶️",
@@ -65,7 +70,7 @@ const defaults: AppSettings = {
 
 export function getSettings(): AppSettings {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = getItem(STORAGE_KEY);
     if (!data) return { ...defaults };
     const parsed = JSON.parse(data) as Partial<AppSettings>;
     return { ...defaults, ...parsed };
@@ -77,11 +82,11 @@ export function getSettings(): AppSettings {
 export function saveSettings(settings: Partial<AppSettings>): void {
   const current = getSettings();
   const next = { ...current, ...settings };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
 export function resetSettings(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  removeItem(STORAGE_KEY);
 }
 
 /** Get rate per day for a room (0 if not set) */

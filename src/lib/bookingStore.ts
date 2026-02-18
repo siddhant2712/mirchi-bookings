@@ -1,10 +1,11 @@
 import { Booking } from "./types";
+import { getItem, setItem, removeItem } from "./idbStorage";
 
 const STORAGE_KEY = "mirchi-hotel-bookings";
 
 export function getBookings(): Booking[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch {
     return [];
@@ -16,16 +17,16 @@ export function saveBooking(booking: Booking): void {
   const idx = bookings.findIndex((b) => b.id === booking.id);
   if (idx >= 0) bookings[idx] = booking;
   else bookings.push(booking);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+  setItem(STORAGE_KEY, JSON.stringify(bookings));
 }
 
 export function deleteBooking(id: string): void {
   const bookings = getBookings().filter((b) => b.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+  setItem(STORAGE_KEY, JSON.stringify(bookings));
 }
 
 export function clearAllBookings(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  removeItem(STORAGE_KEY);
 }
 
 export function exportBookingsJSON(): string {

@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +23,15 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { getSettings, saveSettings, resetSettings, getRooms, DEFAULT_ROOMS, type AppSettings, type RoomConfig } from "@/lib/settingsStore";
+import {
+  getSettings,
+  saveSettings,
+  resetSettings,
+  getRooms,
+  DEFAULT_ROOMS,
+  type AppSettings,
+  type RoomConfig,
+} from "@/lib/settingsStore";
 import { getBookings } from "@/lib/bookingStore";
 import { toast } from "sonner";
 
@@ -64,7 +78,10 @@ export default function SettingsMenu() {
   // Room management
   const addRoom = () => {
     const newId = `R${Date.now().toString(36).toUpperCase().slice(-4)}`;
-    setRooms((prev) => [...prev, { id: newId, label: `Room ${prev.length + 1}`, type: "Room" }]);
+    setRooms((prev) => [
+      ...prev,
+      { id: newId, label: `Room ${prev.length + 1}`, type: "Room" },
+    ]);
   };
 
   const updateRoom = (idx: number, field: keyof RoomConfig, value: string) => {
@@ -87,15 +104,19 @@ export default function SettingsMenu() {
   const bookings = getBookings().filter((b) => b.status !== "cancelled");
   const fromDate = revenueFrom ? new Date(revenueFrom).getTime() : null;
   const toDate = revenueTo ? new Date(revenueTo).getTime() : null;
-  const filtered = fromDate && toDate
-    ? bookings.filter((b) => {
-        const checkIn = new Date(b.checkIn).getTime();
-        return checkIn >= fromDate && checkIn <= toDate;
-      })
-    : bookings;
+  const filtered =
+    fromDate && toDate
+      ? bookings.filter((b) => {
+          const checkIn = new Date(b.checkIn).getTime();
+          return checkIn >= fromDate && checkIn <= toDate;
+        })
+      : bookings;
   const totalRevenue = filtered.reduce((sum, b) => sum + b.amount, 0);
-  const totalTaxRate = ((settings.cgstPercent || 0) + (settings.sgstPercent || 0)) / 100;
-  const revenueExTax = settings.showTaxInRevenue ? totalRevenue / (1 + totalTaxRate) : totalRevenue;
+  const totalTaxRate =
+    ((settings.cgstPercent || 0) + (settings.sgstPercent || 0)) / 100;
+  const revenueExTax = settings.showTaxInRevenue
+    ? totalRevenue / (1 + totalTaxRate)
+    : totalRevenue;
   const taxAmount = totalRevenue - revenueExTax;
   const cgstAmount = revenueExTax * (settings.cgstPercent / 100);
   const sgstAmount = revenueExTax * (settings.sgstPercent / 100);
@@ -121,7 +142,8 @@ export default function SettingsMenu() {
             <Bed className="h-4 w-4" /> Room Configuration
           </CardTitle>
           <CardDescription>
-            Customize room names, types, and rates per day. Changes take effect after saving.
+            Customize room names, types, and rates per day. Changes take effect
+            after saving.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -145,7 +167,9 @@ export default function SettingsMenu() {
                   min={0}
                   step={50}
                   value={settings.roomRates?.[room.id] ?? ""}
-                  onChange={(e) => updateRoomRate(room.id, parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    updateRoomRate(room.id, parseFloat(e.target.value) || 0)
+                  }
                   placeholder="Rate/day"
                   className="w-28 h-9"
                 />
@@ -161,12 +185,19 @@ export default function SettingsMenu() {
               </div>
             ))}
           </div>
-          <div className="text-xs text-muted-foreground">Name · Type · Rate per day (₹)</div>
+          <div className="text-xs text-muted-foreground">
+            Name · Type · Rate per day (₹)
+          </div>
           <div className="flex gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={addRoom}>
               <Plus className="h-4 w-4 mr-1" /> Add Room
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={resetRoomsToDefault}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={resetRoomsToDefault}
+            >
               Reset to defaults
             </Button>
           </div>
@@ -194,13 +225,36 @@ export default function SettingsMenu() {
         </CardContent>
       </Card>
 
+      {/* Check-in time */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Default Check-in Time
+          </CardTitle>
+          <CardDescription>
+            Default time of day for check-in (e.g. 14:00).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label>Check-in time</Label>
+          <Input
+            type="time"
+            value={settings.defaultCheckInTime}
+            onChange={(e) => update({ defaultCheckInTime: e.target.value })}
+            className="w-40"
+          />
+        </CardContent>
+      </Card>
+
       {/* Tax & Currency */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Receipt className="h-4 w-4" /> Tax & Currency
           </CardTitle>
-          <CardDescription>Used in revenue calculator and invoices.</CardDescription>
+          <CardDescription>
+            Used in revenue calculator and invoices.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -232,7 +286,9 @@ export default function SettingsMenu() {
                 max={100}
                 step={0.5}
                 value={settings.cgstPercent}
-                onChange={(e) => update({ cgstPercent: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  update({ cgstPercent: parseFloat(e.target.value) || 0 })
+                }
                 className="w-24"
               />
             </div>
@@ -253,7 +309,9 @@ export default function SettingsMenu() {
                 max={100}
                 step={0.5}
                 value={settings.sgstPercent}
-                onChange={(e) => update({ sgstPercent: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  update({ sgstPercent: parseFloat(e.target.value) || 0 })
+                }
                 className="w-24"
               />
             </div>
@@ -263,10 +321,14 @@ export default function SettingsMenu() {
                 <Input
                   type="number"
                   readOnly
-                  value={(settings.cgstPercent || 0) + (settings.sgstPercent || 0)}
+                  value={
+                    (settings.cgstPercent || 0) + (settings.sgstPercent || 0)
+                  }
                   className="w-24 bg-muted/50"
                 />
-                <span className="text-sm text-muted-foreground">% (auto-calculated)</span>
+                <span className="text-sm text-muted-foreground">
+                  % (auto-calculated)
+                </span>
               </div>
             </div>
           </div>
@@ -280,18 +342,27 @@ export default function SettingsMenu() {
             <Calculator className="h-4 w-4" /> Revenue Calculator
           </CardTitle>
           <CardDescription>
-            Total revenue from bookings. Filter by check-in date and see CGST/SGST breakdown.
+            Total revenue from bookings. Filter by check-in date and see
+            CGST/SGST breakdown.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>From date</Label>
-              <Input type="date" value={revenueFrom} onChange={(e) => setRevenueFrom(e.target.value)} />
+              <Input
+                type="date"
+                value={revenueFrom}
+                onChange={(e) => setRevenueFrom(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label>To date</Label>
-              <Input type="date" value={revenueTo} onChange={(e) => setRevenueTo(e.target.value)} />
+              <Input
+                type="date"
+                value={revenueTo}
+                onChange={(e) => setRevenueTo(e.target.value)}
+              />
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -308,25 +379,50 @@ export default function SettingsMenu() {
               <>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Revenue (ex tax)</span>
-                  <span>{settings.currency}{revenueExTax.toFixed(2)}</span>
+                  <span>
+                    {settings.currency}
+                    {revenueExTax.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>{settings.cgstLabel} ({settings.cgstPercent}%)</span>
-                  <span>{settings.currency}{cgstAmount.toFixed(2)}</span>
+                  <span>
+                    {settings.cgstLabel} ({settings.cgstPercent}%)
+                  </span>
+                  <span>
+                    {settings.currency}
+                    {cgstAmount.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>{settings.sgstLabel} ({settings.sgstPercent}%)</span>
-                  <span>{settings.currency}{sgstAmount.toFixed(2)}</span>
+                  <span>
+                    {settings.sgstLabel} ({settings.sgstPercent}%)
+                  </span>
+                  <span>
+                    {settings.currency}
+                    {sgstAmount.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground border-t pt-1">
-                  <span>Total Tax ({(settings.cgstPercent || 0) + (settings.sgstPercent || 0)}%)</span>
-                  <span>{settings.currency}{taxAmount.toFixed(2)}</span>
+                  <span>
+                    Total Tax (
+                    {(settings.cgstPercent || 0) + (settings.sgstPercent || 0)}
+                    %)
+                  </span>
+                  <span>
+                    {settings.currency}
+                    {taxAmount.toFixed(2)}
+                  </span>
                 </div>
               </>
             )}
             <div className="flex justify-between font-semibold text-base pt-1">
-              <span className="flex items-center gap-1"><TrendingUp className="h-4 w-4" /> Total</span>
-              <span>{settings.currency}{totalRevenue.toFixed(2)}</span>
+              <span className="flex items-center gap-1">
+                <TrendingUp className="h-4 w-4" /> Total
+              </span>
+              <span>
+                {settings.currency}
+                {totalRevenue.toFixed(2)}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground pt-1">
               {filtered.length} booking{filtered.length !== 1 ? "s" : ""}
