@@ -242,9 +242,6 @@ const Index = () => {
     const totalDueVal = totalAmountVal - totalAdvanceVal;
 
     const finalY = (doc as any).lastAutoTable?.finalY || 40;
-    const displayCurrency = /^[\x00-\x7F]+$/.test(s.currency || "")
-      ? s.currency
-      : "Rs";
     doc.setFontSize(10);
     doc.text(
       `Total (excluding deleted): ${displayCurrency}${totalAmountVal.toFixed(2)}`,
