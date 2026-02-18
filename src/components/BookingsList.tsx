@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Booking, ROOMS } from "@/lib/types";
+import { Booking } from "@/lib/types";
+import { getRooms } from "@/lib/settingsStore";
 import { getBookings, saveBooking, deleteBooking } from "@/lib/bookingStore";
 import { getSettings } from "@/lib/settingsStore";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Edit, Trash2, LogIn, LogOut, FileText, Calendar, Bed, Wallet, CheckCircle2, IndianRupee, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { format, differenceInDays } from "date-fns";
 
 interface BookingsListProps {
   onEdit: (booking: Booking) => void;
@@ -20,6 +22,22 @@ interface BookingsListProps {
 
 type DateFilter = "all" | "this-month" | "last-month" | "this-week" | "custom";
 
+function formatDate(dateStr: string): string {
+  try {
+    return format(new Date(dateStr), "dd MMM yyyy");
+  } catch {
+    return dateStr;
+  }
+}
+
+function nightsCount(checkIn: string, checkOut: string): number {
+  try {
+    return Math.max(1, differenceInDays(new Date(checkOut), new Date(checkIn)));
+  } catch {
+    return 1;
+  }
+}
+
 export default function BookingsList({ onEdit, onInvoice, onCheckInOut, refreshKey }: BookingsListProps) {
   const [dueOnly, setDueOnly] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -27,6 +45,7 @@ export default function BookingsList({ onEdit, onInvoice, onCheckInOut, refreshK
   const [customTo, setCustomTo] = useState("");
   const now = new Date();
   const allBookings = getBookings().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const rooms = getRooms();
 
   const filterByDate = (b: Booking): boolean => {
     const checkIn = new Date(b.checkIn).getTime();
@@ -54,17 +73,9 @@ export default function BookingsList({ onEdit, onInvoice, onCheckInOut, refreshK
   let filtered = allBookings.filter(filterByDate);
   filtered = dueOnly ? filtered.filter((b) => b.amount - b.advance > 0 && b.status !== "cancelled") : filtered;
   const bookings = filtered;
-  const currency = getSettings().currency;
-  const roomLabel = (id: string) => ROOMS.find((r) => r.id === id)?.label ?? id;
-
-  const statusVariant = (s: Booking["status"]) => {
-    switch (s) {
-      case "confirmed": return "secondary" as const;
-      case "checked-in": return "default" as const;
-      case "checked-out": return "outline" as const;
-      case "cancelled": return "destructive" as const;
-    }
-  };
+  const settings = getSettings();
+  const currency = settings.currency;
+  const roomLabel = (id: string) => rooms.find((r) => r.id === id)?.label ?? id;
 
   const statusStyles: Record<Booking["status"], string> = {
     confirmed: "bg-amber-100 text-amber-800 border-amber-200",
@@ -153,113 +164,106 @@ export default function BookingsList({ onEdit, onInvoice, onCheckInOut, refreshK
           <span className="text-xs text-muted-foreground">Showing {bookings.length} of {allBookings.length}</span>
         )}
       </div>
+
       {bookings.length === 0 ? (
         <div className="text-center py-12 px-4 border border-dashed rounded-lg bg-muted/20">
           <p className="text-muted-foreground font-medium">No bookings match the selected filters</p>
-          <p className="text-sm text-muted-foreground mt-1">Try changing the date filter or Due only</p>
         </div>
       ) : (
-      <div className="overflow-x-auto rounded-lg border border-border/60">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/40 hover:bg-muted/40 border-b-2 border-border">
-            <TableHead className="font-semibold">Guest</TableHead>
-            <TableHead className="font-semibold">Room</TableHead>
-            <TableHead className="font-semibold">Check-in</TableHead>
-            <TableHead className="font-semibold">Check-out</TableHead>
-            <TableHead className="font-semibold">Amount</TableHead>
-            <TableHead className="font-semibold">Advance</TableHead>
-            <TableHead className="font-semibold">Due</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="text-right font-semibold">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {bookings.map((b, i) => (
-            <TableRow
-              key={b.id}
-              className={cn(
-                "transition-colors",
-                i % 2 === 1 && "bg-muted/20"
-              )}
-            >
-              <TableCell className="font-medium">
-                <span className="block">{b.guestName}</span>
-                {b.phone && <span className="block text-xs text-muted-foreground">{b.phone}</span>}
-              </TableCell>
-              <TableCell>
-                <span className="inline-flex items-center gap-1.5">
-                  <Bed className="h-3.5 w-3.5 text-muted-foreground" />
-                  {roomLabel(b.room)}
-                </span>
-              </TableCell>
-              <TableCell className="text-muted-foreground">{b.checkIn}</TableCell>
-              <TableCell className="text-muted-foreground">{b.checkOut}</TableCell>
-              <TableCell>
-                <span className="inline-flex items-center gap-1">
-                  <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{currency}{b.amount}</span>
-                </span>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {currency}{b.advance}
-              </TableCell>
-              <TableCell className={cn(
-                "font-medium",
-                b.amount - b.advance > 0 ? "text-destructive" : "text-emerald-600"
-              )}>
-                {currency}{b.amount - b.advance}
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant={statusVariant(b.status)}
-                  className={cn(
-                    "border font-medium capitalize",
-                    statusStyles[b.status]
-                  )}
-                >
-                  {b.status.replace("-", " ")}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-1 justify-end flex-wrap">
-                  {b.status === "confirmed" && (
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-emerald-100 hover:text-emerald-700" title="Check In" onClick={() => handleCheckIn(b)}>
-                      <LogIn className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {b.status === "checked-in" && (
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-sky-100 hover:text-sky-700" title="Check Out" onClick={() => handleCheckOut(b)}>
-                      <LogOut className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" title="Invoice" onClick={() => onInvoice(b)}>
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                  {b.amount - b.advance > 0 && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 hover:bg-emerald-100 hover:text-emerald-700"
-                      title="Clear balance"
-                      onClick={() => handleClear(b)}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => onEdit(b)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive" title="Delete" onClick={() => handleDelete(b)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      </div>
+        <div className="overflow-x-auto rounded-lg border border-border/60">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40 border-b-2 border-border">
+                <TableHead className="font-semibold">Guest</TableHead>
+                <TableHead className="font-semibold">Room</TableHead>
+                <TableHead className="font-semibold">Check-in</TableHead>
+                <TableHead className="font-semibold">Check-out</TableHead>
+                <TableHead className="font-semibold">Nights</TableHead>
+                <TableHead className="font-semibold">Amount</TableHead>
+                <TableHead className="font-semibold">Advance</TableHead>
+                <TableHead className="font-semibold">Due</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="text-right font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bookings.map((b, i) => {
+                const nights = nightsCount(b.checkIn, b.checkOut);
+                const due = b.amount - b.advance;
+                return (
+                  <TableRow key={b.id} className={cn("transition-colors", i % 2 === 1 && "bg-muted/20")}>
+                    <TableCell className="font-medium">
+                      <span className="block">{b.guestName}</span>
+                      {b.phone && <span className="block text-xs text-muted-foreground">{b.phone}</span>}
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5 text-sm">
+                        <Bed className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        {roomLabel(b.room)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="block text-sm font-medium">{formatDate(b.checkIn)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="block text-sm font-medium">{formatDate(b.checkOut)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center justify-center w-8 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                        {nights}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1">
+                        <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-semibold">{currency}{b.amount.toLocaleString()}</span>
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {currency}{b.advance.toLocaleString()}
+                    </TableCell>
+                    <TableCell className={cn("font-semibold", due > 0 ? "text-destructive" : "text-emerald-600")}>
+                      {due > 0 ? `${currency}${due.toLocaleString()}` : "✓ Paid"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn("border font-medium capitalize text-xs", statusStyles[b.status])}>
+                        {b.status.replace("-", " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        {b.status === "confirmed" && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-emerald-100 hover:text-emerald-700" title="Check In" onClick={() => handleCheckIn(b)}>
+                            <LogIn className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {b.status === "checked-in" && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-sky-100 hover:text-sky-700" title="Check Out" onClick={() => handleCheckOut(b)}>
+                            <LogOut className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" title="Invoice" onClick={() => onInvoice(b)}>
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        {due > 0 && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-emerald-100 hover:text-emerald-700" title="Clear balance" onClick={() => handleClear(b)}>
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => onEdit(b)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive" title="Delete" onClick={() => handleDelete(b)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );

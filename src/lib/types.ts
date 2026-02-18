@@ -1,3 +1,5 @@
+import { getRooms, RoomConfig } from "@/lib/settingsStore";
+
 export interface Booking {
   id: string;
   guestName: string;
@@ -16,6 +18,14 @@ export interface Booking {
   guestGstNumber?: string;
 }
 
+export type { RoomConfig };
+
+/** Dynamic rooms list from settings */
+export function getRoomList(): RoomConfig[] {
+  return getRooms();
+}
+
+/** @deprecated Use getRoomList() instead for dynamic rooms */
 export const ROOMS = [
   { id: "101", type: "Room", label: "Room 101" },
   { id: "102", type: "Room", label: "Room 102" },

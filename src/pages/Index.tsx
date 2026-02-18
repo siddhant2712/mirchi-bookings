@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Download, Plus, Hotel, CalendarIcon, LayoutDashboard, Settings, FileText, CalendarDays, ListChecks } from "lucide-react";
+import { Download, Plus, Hotel, CalendarIcon, LayoutDashboard, Settings, FileText, CalendarDays, ListChecks, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import RoomGrid from "@/components/RoomGrid";
@@ -16,8 +16,11 @@ import SettingsMenu from "@/components/SettingsMenu";
 import SimpleInvoiceGenerator from "@/components/SimpleInvoiceGenerator";
 import CalendarView from "@/components/CalendarView";
 import { Booking } from "@/lib/types";
-import { exportBookingsJSON, exportBookingsCSV, downloadFile, getBookings } from "@/lib/bookingStore";
+import { exportBookingsJSON, downloadFile, getBookings, clearAllBookings } from "@/lib/bookingStore";
+import { getSettings } from "@/lib/settingsStore";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const Index = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -62,9 +65,48 @@ const Index = () => {
     toast.success("JSON downloaded!");
   };
 
-  const handleExportCSV = () => {
-    downloadFile(exportBookingsCSV(), "mirchi-bookings.csv", "text/csv");
-    toast.success("CSV downloaded!");
+  const handleExportPDF = () => {
+    const bookings = getBookings();
+    if (!bookings.length) { toast.error("No bookings to export"); return; }
+    const s = getSettings();
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(s.businessName.replace(/[^\x00-\x7F]/g, ""), 14, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Bookings Report — ${new Date().toLocaleDateString("en-IN")}`, 14, 26);
+    autoTable(doc, {
+      startY: 32,
+      head: [["Guest", "Phone", "Room", "Check-in", "Check-out", "Nights", "Amount", "Advance", "Due", "Status"]],
+      body: bookings.map((b) => {
+        const nights = Math.max(1, Math.ceil((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86400000));
+        return [
+          b.guestName,
+          b.phone || "—",
+          b.room,
+          b.checkIn,
+          b.checkOut,
+          nights,
+          `${s.currency}${b.amount}`,
+          `${s.currency}${b.advance}`,
+          `${s.currency}${b.amount - b.advance}`,
+          b.status,
+        ];
+      }),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [217, 119, 6] },
+      alternateRowStyles: { fillColor: [254, 252, 232] },
+    });
+    doc.save("mirchi-bookings.pdf");
+    toast.success("PDF downloaded!");
+  };
+
+  const handleClearAll = () => {
+    if (confirm("Delete ALL bookings? This cannot be undone.")) {
+      clearAllBookings();
+      refresh();
+      toast.success("All bookings cleared.");
+    }
   };
 
   return (
@@ -82,11 +124,14 @@ const Index = () => {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
-            <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-1" /> CSV
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <Download className="h-4 w-4 mr-1" /> PDF
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportJSON}>
               <Download className="h-4 w-4 mr-1" /> JSON
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleClearAll} className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30">
+              <Trash2 className="h-4 w-4 mr-1" /> Clear All
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setShowSimpleInvoice(true)}>
               <FileText className="h-4 w-4 mr-1" /> Invoice

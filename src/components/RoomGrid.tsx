@@ -1,4 +1,4 @@
-import { ROOMS } from "@/lib/types";
+import { getRooms } from "@/lib/settingsStore";
 import { getBookings } from "@/lib/bookingStore";
 import { Bed, PartyPopper } from "lucide-react";
 
@@ -9,6 +9,7 @@ interface RoomGridProps {
 
 export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) {
   const bookings = getBookings();
+  const rooms = getRooms();
   const targetDate = selectedDate
     ? selectedDate.toISOString().split("T")[0]
     : new Date().toISOString().split("T")[0];
@@ -41,7 +42,7 @@ export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) 
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-      {ROOMS.map((room) => {
+      {rooms.map((room) => {
         const status = getStatus(room.id);
         const guest = getGuestName(room.id);
         const statusColors = {

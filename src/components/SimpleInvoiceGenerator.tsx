@@ -22,7 +22,10 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
   const [gstNumber, setGstNumber] = useState("");
   const [phone, setPhone] = useState("");
   const [items, setItems] = useState<{ desc: string; amount: string }[]>([{ desc: "", amount: "" }]);
-  const [taxAmount, setTaxAmount] = useState("");
+  const [cgstLabel, setCgstLabel] = useState(s.cgstLabel);
+  const [sgstLabel, setSgstLabel] = useState(s.sgstLabel);
+  const [cgstPercent, setCgstPercent] = useState(s.cgstPercent);
+  const [sgstPercent, setSgstPercent] = useState(s.sgstPercent);
   const [footer, setFooter] = useState(s.invoiceFooter);
 
   const addItem = () => setItems([...items, { desc: "", amount: "" }]);
@@ -34,8 +37,10 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
   };
 
   const subtotal = items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
-  const tax = parseFloat(taxAmount || "0");
-  const total = subtotal + tax;
+  const cgstAmount = subtotal * (cgstPercent / 100);
+  const sgstAmount = subtotal * (sgstPercent / 100);
+  const totalTax = cgstAmount + sgstAmount;
+  const total = subtotal + totalTax;
   const invoiceId = "INV-" + Date.now().toString(36).toUpperCase();
 
   function escapeHtml(text: string): string {
@@ -84,7 +89,8 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
           <tbody>
             ${itemRows}
             <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
-            <tr class="inv-row-sub"><td class="inv-desc">Tax</td><td class="inv-amt">${s.currency}${tax.toFixed(2)}</td></tr>
+            <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
+            <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
             <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
           </tbody>
         </table>
@@ -194,9 +200,15 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
             </div>
           ))}
         </div>
-        <div className="flex gap-2 items-center mt-2">
-          <Label className="w-20">Tax</Label>
-          <Input type="number" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} placeholder="0" className="w-28" />
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="flex gap-2 items-center">
+            <Label className="w-20">{cgstLabel} (%)</Label>
+            <Input type="number" value={cgstPercent} onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)} placeholder="0" className="w-20" />
+          </div>
+          <div className="flex gap-2 items-center">
+            <Label className="w-20">{sgstLabel} (%)</Label>
+            <Input type="number" value={sgstPercent} onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)} placeholder="0" className="w-20" />
+          </div>
         </div>
       </div>
 
@@ -249,8 +261,12 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
               <td className="py-2 text-right">{s.currency}{subtotal.toFixed(2)}</td>
             </tr>
             <tr className="border-b">
-              <td className="py-2">Tax</td>
-              <td className="py-2 text-right">{s.currency}{tax.toFixed(2)}</td>
+              <td className="py-2 text-muted-foreground">{cgstLabel} ({cgstPercent}%)</td>
+              <td className="py-2 text-right text-muted-foreground">{s.currency}{cgstAmount.toFixed(2)}</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 text-muted-foreground">{sgstLabel} ({sgstPercent}%)</td>
+              <td className="py-2 text-right text-muted-foreground">{s.currency}{sgstAmount.toFixed(2)}</td>
             </tr>
             <tr>
               <td className="py-2 font-bold">Total</td>
