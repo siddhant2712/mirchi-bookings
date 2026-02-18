@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { Booking } from "@/lib/types";
 import { getRooms } from "@/lib/settingsStore";
-import { getBookings, saveBooking, deleteBooking } from "@/lib/bookingStore";
+import {
+  getBookings,
+  saveBooking,
+  deleteBooking,
+  getDeletedBookings,
+  restoreDeletedBooking,
+  purgeDeletedBooking,
+} from "@/lib/bookingStore";
 import { getSettings } from "@/lib/settingsStore";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,9 +86,13 @@ export default function BookingsList({
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const now = new Date();
-  const allBookings = getBookings().sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  const rawActive = getBookings();
+  const rawDeleted = getDeletedBookings();
+  const allBookings = [...rawActive, ...rawDeleted].sort((a, b) => {
+    const ta = new Date((a as any).deletedAt ?? a.createdAt).getTime();
+    const tb = new Date((b as any).deletedAt ?? b.createdAt).getTime();
+    return tb - ta;
+  });
   const rooms = getRooms();
 
   const filterByDate = (b: Booking): boolean => {
@@ -180,6 +191,10 @@ export default function BookingsList({
   const dueCount = allBookings.filter(
     (b) => b.amount - b.advance > 0 && b.status !== "cancelled",
   ).length;
+  // exclude deleted entries from due count
+  const dueCountExcludingDeleted = rawActive.filter(
+    (b) => b.amount - b.advance > 0 && b.status !== "cancelled",
+  ).length;
 
   return (
     <div className="space-y-3">
@@ -225,7 +240,8 @@ export default function BookingsList({
             className="flex items-center gap-2"
           >
             <IndianRupee className="h-4 w-4" />
-            Due only {dueCount > 0 && `(${dueCount})`}
+            Due only{" "}
+            {dueCountExcludingDeleted > 0 && `(${dueCountExcludingDeleted})`}
           </Button>
         </div>
         {bookings.length < allBookings.length && (
@@ -269,7 +285,11 @@ export default function BookingsList({
                     key={b.id}
                     className={cn(
                       "transition-colors",
-                      i % 2 === 1 && "bg-muted/20",
+                      (b as any).purgedAt
+                        ? "bg-red-50 opacity-60 pointer-events-none"
+                        : (b as any).deletedAt
+                          ? "bg-red-50"
+                          : i % 2 === 1 && "bg-muted/20",
                     )}
                   >
                     <TableCell className="font-medium">
@@ -328,70 +348,124 @@ export default function BookingsList({
                       <Badge
                         className={cn(
                           "border font-medium capitalize text-xs",
-                          statusStyles[b.status],
+                          (b as any).purgedAt
+                            ? "bg-red-200 text-red-800 border-red-300"
+                            : (b as any).deletedAt
+                              ? "bg-red-100 text-red-700 border-red-200"
+                              : statusStyles[b.status],
                         )}
                       >
-                        {b.status.replace("-", " ")}
+                        {String(b.status).replace("-", " ")}
+                        {(b as any).purgedAt
+                          ? " (deleted permanently)"
+                          : (b as any).deletedAt
+                            ? " (deleted)"
+                            : ""}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end flex-wrap">
-                        {b.status === "confirmed" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleCheckIn(b)}
-                            className="flex items-center gap-2"
-                          >
-                            <LogIn className="h-4 w-4" /> Check In
-                          </Button>
+                        {(b as any).deletedAt ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (
+                                  confirm(`Restore booking for ${b.guestName}?`)
+                                ) {
+                                  restoreDeletedBooking(b.id);
+                                  toast.success("Booking restored");
+                                  window.dispatchEvent(
+                                    new Event("bookings-updated"),
+                                  );
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              Restore
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Permanently delete booking for ${b.guestName}? This cannot be undone.`,
+                                  )
+                                ) {
+                                  purgeDeletedBooking(b.id);
+                                  toast.success("Booking permanently deleted");
+                                  window.dispatchEvent(
+                                    new Event("bookings-updated"),
+                                  );
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              Purge
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            {b.status === "confirmed" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleCheckIn(b)}
+                                className="flex items-center gap-2"
+                              >
+                                <LogIn className="h-4 w-4" /> Check In
+                              </Button>
+                            )}
+                            {b.status === "checked-in" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleCheckOut(b)}
+                                className="flex items-center gap-2"
+                              >
+                                <LogOut className="h-4 w-4" /> Check Out
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onInvoice(b)}
+                              className="flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" /> Invoice
+                            </Button>
+                            {due > 0 && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleClear(b)}
+                                className="flex items-center gap-2"
+                              >
+                                <CheckCircle2 className="h-4 w-4" /> Mark Paid
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              title="Edit"
+                              onClick={() => onEdit(b)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                              title="Delete"
+                              onClick={() => handleDelete(b)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
-                        {b.status === "checked-in" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleCheckOut(b)}
-                            className="flex items-center gap-2"
-                          >
-                            <LogOut className="h-4 w-4" /> Check Out
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onInvoice(b)}
-                          className="flex items-center gap-2"
-                        >
-                          <FileText className="h-4 w-4" /> Invoice
-                        </Button>
-                        {due > 0 && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleClear(b)}
-                            className="flex items-center gap-2"
-                          >
-                            <CheckCircle2 className="h-4 w-4" /> Mark Paid
-                          </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          title="Edit"
-                          onClick={() => onEdit(b)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete"
-                          onClick={() => handleDelete(b)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

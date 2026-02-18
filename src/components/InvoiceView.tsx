@@ -5,7 +5,9 @@ import { getSettings } from "@/lib/settingsStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Printer, X, Pencil } from "lucide-react";
+import { Printer, X, Pencil, Download } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface InvoiceViewProps {
   booking: Booking;
@@ -14,13 +16,23 @@ interface InvoiceViewProps {
 
 export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   const rooms = getRooms();
-  const roomLabel = rooms.find((r) => r.id === booking.room)?.label ?? booking.room;
-  const nights = Math.max(1, Math.ceil((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000));
+  const roomLabel =
+    rooms.find((r) => r.id === booking.room)?.label ?? booking.room;
+  const nights = Math.max(
+    1,
+    Math.ceil(
+      (new Date(booking.checkOut).getTime() -
+        new Date(booking.checkIn).getTime()) /
+        86400000,
+    ),
+  );
 
   const s = getSettings();
   const [editing, setEditing] = useState(false);
   const [hotelName, setHotelName] = useState(s.businessName);
-  const [hotelGstNumber, setHotelGstNumber] = useState(s.businessGstNumber ?? "");
+  const [hotelGstNumber, setHotelGstNumber] = useState(
+    s.businessGstNumber ?? "",
+  );
   const [hotelAddress, setHotelAddress] = useState(s.businessAddress ?? "");
   const [hotelPhone, setHotelPhone] = useState(s.businessContact ?? "");
   const [invoiceTitle, setInvoiceTitle] = useState(s.invoiceTitle);
@@ -32,14 +44,22 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   const [sgstPercent, setSgstPercent] = useState(s.sgstPercent);
   const [guestName, setGuestName] = useState(booking.guestName);
   const [phone, setPhone] = useState(booking.phone);
-  const [companyName, setCompanyName] = useState(booking.guestCompanyName ?? "");
+  const [companyName, setCompanyName] = useState(
+    booking.guestCompanyName ?? "",
+  );
   const [gstNumber, setGstNumber] = useState(booking.guestGstNumber ?? "");
-  const [description, setDescription] = useState(`${roomLabel} — ${nights} night${nights > 1 ? "s" : ""}`);
-  const [dateRange, setDateRange] = useState(`${booking.checkIn} to ${booking.checkOut}`);
+  const [description, setDescription] = useState(
+    `${roomLabel} — ${nights} night${nights > 1 ? "s" : ""}`,
+  );
+  const [dateRange, setDateRange] = useState(
+    `${booking.checkIn} to ${booking.checkOut}`,
+  );
   const [totalAmount, setTotalAmount] = useState(booking.amount.toString());
   const [advancePaid, setAdvancePaid] = useState(booking.advance.toString());
   const [extraNotes, setExtraNotes] = useState(booking.notes ?? "");
-  const [extraItems, setExtraItems] = useState<{ desc: string; amount: string }[]>([]);
+  const [extraItems, setExtraItems] = useState<
+    { desc: string; amount: string }[]
+  >([]);
 
   useEffect(() => {
     const s = getSettings();
@@ -58,15 +78,19 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setGstNumber(booking.guestGstNumber ?? "");
   }, [booking.id]);
 
-  const subtotal = parseFloat(totalAmount || "0") + extraItems.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+  const subtotal =
+    parseFloat(totalAmount || "0") +
+    extraItems.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
   const cgstAmount = subtotal * (cgstPercent / 100);
   const sgstAmount = subtotal * (sgstPercent / 100);
   const totalTax = cgstAmount + sgstAmount;
   const total = subtotal + totalTax;
   const balance = total - parseFloat(advancePaid || "0");
 
-  const addExtraItem = () => setExtraItems([...extraItems, { desc: "", amount: "" }]);
-  const removeExtraItem = (idx: number) => setExtraItems(extraItems.filter((_, i) => i !== idx));
+  const addExtraItem = () =>
+    setExtraItems([...extraItems, { desc: "", amount: "" }]);
+  const removeExtraItem = (idx: number) =>
+    setExtraItems(extraItems.filter((_, i) => i !== idx));
 
   function escapeHtml(text: string): string {
     const el = document.createElement("div");
@@ -77,7 +101,12 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   const handlePrint = () => {
     const lineRows = [
       `<tr><td class="inv-desc">${escapeHtml(description)}<br><span class="inv-muted">${escapeHtml(dateRange)}</span></td><td class="inv-amt">${currency}${parseFloat(totalAmount).toFixed(2)}</td></tr>`,
-      ...extraItems.filter((i) => i.desc || i.amount).map((i) => `<tr><td class="inv-desc">${escapeHtml(i.desc)}</td><td class="inv-amt">${currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`),
+      ...extraItems
+        .filter((i) => i.desc || i.amount)
+        .map(
+          (i) =>
+            `<tr><td class="inv-desc">${escapeHtml(i.desc)}</td><td class="inv-amt">${currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`,
+        ),
     ].join("");
 
     const printBody = `
@@ -134,7 +163,10 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
       </div>`;
 
     const win = window.open("", "_blank");
-    if (!win) { alert("Please allow popups to print."); return; }
+    if (!win) {
+      alert("Please allow popups to print.");
+      return;
+    }
     win.document.write(`
       <!DOCTYPE html>
       <html><head>
@@ -187,21 +219,95 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setTimeout(() => win.print(), 300);
   };
 
+  const handleDownloadPDF = () => {
+    const s = getSettings();
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(s.businessName.replace(/[^\x00-\x7F]/g, ""), 14, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(90);
+    doc.text(invoiceTitle || "Invoice", 14, 26);
+
+    const rows: any[] = [];
+    rows.push([
+      description,
+      currency + parseFloat(totalAmount || "0").toFixed(2),
+    ]);
+    extraItems
+      .filter((i) => i.desc || i.amount)
+      .forEach((it) => {
+        rows.push([
+          it.desc,
+          currency + parseFloat(it.amount || "0").toFixed(2),
+        ]);
+      });
+
+    let startY = 34;
+    autoTable(doc, {
+      startY,
+      head: [["Description", "Amount"]],
+      body: rows,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [217, 119, 6] },
+    });
+
+    const finalY =
+      (doc as any).lastAutoTable?.finalY || startY + rows.length * 8 + 10;
+    doc.setFontSize(10);
+    doc.text(`Subtotal: ${currency}${subtotal.toFixed(2)}`, 14, finalY + 10);
+    doc.text(
+      `${cgstLabel} (${cgstPercent}%): ${currency}${cgstAmount.toFixed(2)}`,
+      14,
+      finalY + 16,
+    );
+    doc.text(
+      `${sgstLabel} (${sgstPercent}%): ${currency}${sgstAmount.toFixed(2)}`,
+      14,
+      finalY + 22,
+    );
+    doc.setFontSize(12);
+    doc.text(`Total: ${currency}${total.toFixed(2)}`, 14, finalY + 30);
+
+    const filename = `invoice-${booking.id.slice(0, 8)}.pdf`;
+    doc.save(filename);
+  };
+
   const ef = (v: string, set: (s: string) => void, placeholder: string) =>
-    editing
-      ? <Input value={v} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="h-8 text-sm" />
-      : <span>{v || "—"}</span>;
+    editing ? (
+      <Input
+        value={v}
+        onChange={(e) => set(e.target.value)}
+        placeholder={placeholder}
+        className="h-8 text-sm"
+      />
+    ) : (
+      <span>{v || "—"}</span>
+    );
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold">Invoice Preview</h3>
         <div className="flex gap-2">
-          <Button size="sm" variant={editing ? "default" : "outline"} onClick={() => setEditing(!editing)}>
-            <Pencil className="h-4 w-4 mr-1" />{editing ? "Done Editing" : "Edit"}
+          <Button
+            size="sm"
+            variant={editing ? "default" : "outline"}
+            onClick={() => setEditing(!editing)}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            {editing ? "Done Editing" : "Edit"}
           </Button>
-          <Button size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-1" />Print</Button>
-          <Button size="sm" variant="outline" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-1" />
+            Download
+          </Button>
+          <Button size="sm" variant="outline" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -210,18 +316,47 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
         <div className="text-center border-b border-border pb-4">
           {editing ? (
             <div className="space-y-2">
-              <Input className="text-center font-bold text-xl" value={hotelName} onChange={(e) => setHotelName(e.target.value)} />
-              <Input className="text-center text-xs" value={invoiceTitle} onChange={(e) => setInvoiceTitle(e.target.value)} />
-              <Input className="text-center text-xs" value={hotelGstNumber} onChange={(e) => setHotelGstNumber(e.target.value)} placeholder="GSTIN" />
-              <Input className="text-center text-xs" value={hotelAddress} onChange={(e) => setHotelAddress(e.target.value)} placeholder="Address" />
-              <Input className="text-center text-xs" value={hotelPhone} onChange={(e) => setHotelPhone(e.target.value)} placeholder="Phone" />
+              <Input
+                className="text-center font-bold text-xl"
+                value={hotelName}
+                onChange={(e) => setHotelName(e.target.value)}
+              />
+              <Input
+                className="text-center text-xs"
+                value={invoiceTitle}
+                onChange={(e) => setInvoiceTitle(e.target.value)}
+              />
+              <Input
+                className="text-center text-xs"
+                value={hotelGstNumber}
+                onChange={(e) => setHotelGstNumber(e.target.value)}
+                placeholder="GSTIN"
+              />
+              <Input
+                className="text-center text-xs"
+                value={hotelAddress}
+                onChange={(e) => setHotelAddress(e.target.value)}
+                placeholder="Address"
+              />
+              <Input
+                className="text-center text-xs"
+                value={hotelPhone}
+                onChange={(e) => setHotelPhone(e.target.value)}
+                placeholder="Phone"
+              />
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-extrabold text-primary">{hotelName}</h1>
-              <p className="text-muted-foreground text-xs uppercase tracking-widest mt-1">{invoiceTitle}</p>
+              <h1 className="text-2xl font-extrabold text-primary">
+                {hotelName}
+              </h1>
+              <p className="text-muted-foreground text-xs uppercase tracking-widest mt-1">
+                {invoiceTitle}
+              </p>
               <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
-                <p className="font-semibold text-foreground/80">GSTIN: {hotelGstNumber || "—"}</p>
+                <p className="font-semibold text-foreground/80">
+                  GSTIN: {hotelGstNumber || "—"}
+                </p>
                 <p>📍 {hotelAddress || "—"}</p>
                 <p>📞 {hotelPhone || "—"}</p>
               </div>
@@ -232,28 +367,62 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
         {/* Meta */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Bill To</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+              Bill To
+            </p>
             {editing ? (
               <div className="space-y-1.5">
-                <Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Guest name" className="h-8" />
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="h-8" />
-                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company" className="h-8" />
-                <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="GST number" className="h-8" />
+                <Input
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Guest name"
+                  className="h-8"
+                />
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Phone"
+                  className="h-8"
+                />
+                <Input
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Company"
+                  className="h-8"
+                />
+                <Input
+                  value={gstNumber}
+                  onChange={(e) => setGstNumber(e.target.value)}
+                  placeholder="GST number"
+                  className="h-8"
+                />
               </div>
             ) : (
               <>
                 <p className="font-bold text-base">{guestName}</p>
-                <p className="text-muted-foreground text-xs">📞 {phone || "—"}</p>
+                <p className="text-muted-foreground text-xs">
+                  📞 {phone || "—"}
+                </p>
                 {companyName && <p className="font-medium">{companyName}</p>}
-                {gstNumber && <p className="text-muted-foreground text-xs">GST: {gstNumber}</p>}
+                {gstNumber && (
+                  <p className="text-muted-foreground text-xs">
+                    GST: {gstNumber}
+                  </p>
+                )}
               </>
             )}
           </div>
           <div className="text-right space-y-1">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Invoice</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+              Invoice
+            </p>
             <p className="font-bold">#{booking.id.slice(0, 8).toUpperCase()}</p>
-            <p className="text-muted-foreground text-xs">{new Date().toLocaleDateString("en-IN")}</p>
-            <p className="text-xs capitalize text-muted-foreground">{booking.status.replace("-", " ")}</p>
+            <p className="text-muted-foreground text-xs">
+              {new Date().toLocaleDateString("en-IN")}
+            </p>
+            <p className="text-xs capitalize text-muted-foreground">
+              {booking.status.replace("-", " ")}
+            </p>
           </div>
         </div>
 
@@ -261,8 +430,12 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-amber-50 dark:bg-amber-950/30">
-              <th className="text-left py-2.5 px-3 text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300 font-bold border-b-2 border-amber-200">Description</th>
-              <th className="text-right py-2.5 px-3 text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300 font-bold border-b-2 border-amber-200">Amount</th>
+              <th className="text-left py-2.5 px-3 text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300 font-bold border-b-2 border-amber-200">
+                Description
+              </th>
+              <th className="text-right py-2.5 px-3 text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300 font-bold border-b-2 border-amber-200">
+                Amount
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -271,20 +444,40 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               <td className="py-2.5 px-3">
                 {editing ? (
                   <div className="space-y-1">
-                    <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-8" />
-                    <Input value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="h-7 text-xs" />
+                    <Input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="h-8"
+                    />
+                    <Input
+                      value={dateRange}
+                      onChange={(e) => setDateRange(e.target.value)}
+                      className="h-7 text-xs"
+                    />
                   </div>
                 ) : (
                   <>
                     <span className="font-medium">{description}</span>
-                    <span className="block text-muted-foreground text-xs mt-0.5">{dateRange}</span>
+                    <span className="block text-muted-foreground text-xs mt-0.5">
+                      {dateRange}
+                    </span>
                   </>
                 )}
               </td>
               <td className="py-2.5 px-3 text-right">
-                {editing
-                  ? <Input type="number" className="w-28 ml-auto text-right h-8" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} />
-                  : <span className="font-medium">{currency}{parseFloat(totalAmount).toFixed(2)}</span>}
+                {editing ? (
+                  <Input
+                    type="number"
+                    className="w-28 ml-auto text-right h-8"
+                    value={totalAmount}
+                    onChange={(e) => setTotalAmount(e.target.value)}
+                  />
+                ) : (
+                  <span className="font-medium">
+                    {currency}
+                    {parseFloat(totalAmount).toFixed(2)}
+                  </span>
+                )}
               </td>
             </tr>
 
@@ -294,80 +487,179 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
                 <td className="py-2 px-3">
                   {editing ? (
                     <div className="flex gap-2 items-center">
-                      <Input value={item.desc} onChange={(e) => { const n = [...extraItems]; n[idx].desc = e.target.value; setExtraItems(n); }} placeholder="Item description" className="h-8" />
-                      <Button type="button" size="icon" variant="ghost" onClick={() => removeExtraItem(idx)} className="shrink-0 h-8 w-8"><X className="h-3 w-3" /></Button>
+                      <Input
+                        value={item.desc}
+                        onChange={(e) => {
+                          const n = [...extraItems];
+                          n[idx].desc = e.target.value;
+                          setExtraItems(n);
+                        }}
+                        placeholder="Item description"
+                        className="h-8"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeExtraItem(idx)}
+                        className="shrink-0 h-8 w-8"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                  ) : item.desc}
+                  ) : (
+                    item.desc
+                  )}
                 </td>
                 <td className="py-2 px-3 text-right">
-                  {editing
-                    ? <Input type="number" className="w-28 ml-auto text-right h-8" value={item.amount} onChange={(e) => { const n = [...extraItems]; n[idx].amount = e.target.value; setExtraItems(n); }} />
-                    : `${currency}${parseFloat(item.amount || "0").toFixed(2)}`}
+                  {editing ? (
+                    <Input
+                      type="number"
+                      className="w-28 ml-auto text-right h-8"
+                      value={item.amount}
+                      onChange={(e) => {
+                        const n = [...extraItems];
+                        n[idx].amount = e.target.value;
+                        setExtraItems(n);
+                      }}
+                    />
+                  ) : (
+                    `${currency}${parseFloat(item.amount || "0").toFixed(2)}`
+                  )}
                 </td>
               </tr>
             ))}
 
             {editing && (
-              <tr><td colSpan={2} className="py-2 px-3">
-                <Button type="button" variant="outline" size="sm" onClick={addExtraItem}>+ Add Line Item</Button>
-              </td></tr>
+              <tr>
+                <td colSpan={2} className="py-2 px-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addExtraItem}
+                  >
+                    + Add Line Item
+                  </Button>
+                </td>
+              </tr>
             )}
 
             {/* Subtotal */}
             <tr className="border-b border-border bg-muted/30">
-              <td className="py-2 px-3 text-muted-foreground font-semibold">Subtotal</td>
-              <td className="py-2 px-3 text-right text-muted-foreground">{currency}{subtotal.toFixed(2)}</td>
+              <td className="py-2 px-3 text-muted-foreground font-semibold">
+                Subtotal
+              </td>
+              <td className="py-2 px-3 text-right text-muted-foreground">
+                {currency}
+                {subtotal.toFixed(2)}
+              </td>
             </tr>
 
             {/* CGST */}
             <tr className="border-b border-border bg-muted/20">
               <td className="py-2 px-3 text-muted-foreground">
-                {editing
-                  ? <div className="flex gap-2 items-center">
-                      <Input value={cgstLabel} onChange={(e) => setCgstLabel(e.target.value)} className="w-24 h-7 text-xs" />
-                      <Input type="number" value={cgstPercent} onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)} className="w-16 h-7 text-xs" />
-                      <span className="text-xs">%</span>
-                    </div>
-                  : <span>{cgstLabel} ({cgstPercent}%)</span>}
+                {editing ? (
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={cgstLabel}
+                      onChange={(e) => setCgstLabel(e.target.value)}
+                      className="w-24 h-7 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      value={cgstPercent}
+                      onChange={(e) =>
+                        setCgstPercent(parseFloat(e.target.value) || 0)
+                      }
+                      className="w-16 h-7 text-xs"
+                    />
+                    <span className="text-xs">%</span>
+                  </div>
+                ) : (
+                  <span>
+                    {cgstLabel} ({cgstPercent}%)
+                  </span>
+                )}
               </td>
-              <td className="py-2 px-3 text-right text-muted-foreground">{currency}{cgstAmount.toFixed(2)}</td>
+              <td className="py-2 px-3 text-right text-muted-foreground">
+                {currency}
+                {cgstAmount.toFixed(2)}
+              </td>
             </tr>
 
             {/* SGST */}
             <tr className="border-b border-border bg-muted/20">
               <td className="py-2 px-3 text-muted-foreground">
-                {editing
-                  ? <div className="flex gap-2 items-center">
-                      <Input value={sgstLabel} onChange={(e) => setSgstLabel(e.target.value)} className="w-24 h-7 text-xs" />
-                      <Input type="number" value={sgstPercent} onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)} className="w-16 h-7 text-xs" />
-                      <span className="text-xs">%</span>
-                    </div>
-                  : <span>{sgstLabel} ({sgstPercent}%)</span>}
+                {editing ? (
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      value={sgstLabel}
+                      onChange={(e) => setSgstLabel(e.target.value)}
+                      className="w-24 h-7 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      value={sgstPercent}
+                      onChange={(e) =>
+                        setSgstPercent(parseFloat(e.target.value) || 0)
+                      }
+                      className="w-16 h-7 text-xs"
+                    />
+                    <span className="text-xs">%</span>
+                  </div>
+                ) : (
+                  <span>
+                    {sgstLabel} ({sgstPercent}%)
+                  </span>
+                )}
               </td>
-              <td className="py-2 px-3 text-right text-muted-foreground">{currency}{sgstAmount.toFixed(2)}</td>
+              <td className="py-2 px-3 text-right text-muted-foreground">
+                {currency}
+                {sgstAmount.toFixed(2)}
+              </td>
             </tr>
 
             {/* Total */}
             <tr className="bg-amber-50 dark:bg-amber-950/30 border-b-2 border-amber-200">
-              <td className="py-3 px-3 font-bold text-amber-900 dark:text-amber-200 text-base">Total</td>
-              <td className="py-3 px-3 text-right font-bold text-amber-900 dark:text-amber-200 text-base">{currency}{total.toFixed(2)}</td>
+              <td className="py-3 px-3 font-bold text-amber-900 dark:text-amber-200 text-base">
+                Total
+              </td>
+              <td className="py-3 px-3 text-right font-bold text-amber-900 dark:text-amber-200 text-base">
+                {currency}
+                {total.toFixed(2)}
+              </td>
             </tr>
 
             {/* Advance */}
             <tr className="border-b border-border bg-emerald-50/50 dark:bg-emerald-950/20">
-              <td className="py-2 px-3 text-emerald-700 dark:text-emerald-400">Advance Paid</td>
+              <td className="py-2 px-3 text-emerald-700 dark:text-emerald-400">
+                Advance Paid
+              </td>
               <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400">
-                {editing
-                  ? <Input type="number" className="w-28 ml-auto text-right h-8" value={advancePaid} onChange={(e) => setAdvancePaid(e.target.value)} />
-                  : `− ${currency}${parseFloat(advancePaid).toFixed(2)}`}
+                {editing ? (
+                  <Input
+                    type="number"
+                    className="w-28 ml-auto text-right h-8"
+                    value={advancePaid}
+                    onChange={(e) => setAdvancePaid(e.target.value)}
+                  />
+                ) : (
+                  `− ${currency}${parseFloat(advancePaid).toFixed(2)}`
+                )}
               </td>
             </tr>
 
             {/* Balance */}
             <tr>
-              <td className="py-3 px-3 font-extrabold text-base">Balance Due</td>
-              <td className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}>
-                {currency}{balance.toFixed(2)}
+              <td className="py-3 px-3 font-extrabold text-base">
+                Balance Due
+              </td>
+              <td
+                className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}
+              >
+                {currency}
+                {balance.toFixed(2)}
               </td>
             </tr>
           </tbody>
@@ -375,10 +667,18 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
         {(extraNotes || editing) && (
           <div className="text-sm bg-muted/30 rounded-lg p-3 border-l-4 border-amber-400">
-            <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Notes</p>
-            {editing
-              ? <Textarea value={extraNotes} onChange={(e) => setExtraNotes(e.target.value)} rows={2} />
-              : <p>{extraNotes}</p>}
+            <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">
+              Notes
+            </p>
+            {editing ? (
+              <Textarea
+                value={extraNotes}
+                onChange={(e) => setExtraNotes(e.target.value)}
+                rows={2}
+              />
+            ) : (
+              <p>{extraNotes}</p>
+            )}
           </div>
         )}
 

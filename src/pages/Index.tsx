@@ -40,6 +40,7 @@ import {
   exportBookingsJSON,
   downloadFile,
   getBookings,
+  getDeletedBookings,
   clearAllBookings,
 } from "@/lib/bookingStore";
 import { getSettings } from "@/lib/settingsStore";
@@ -92,8 +93,9 @@ const Index = () => {
   }, [refresh]);
 
   const handleExportPDF = () => {
-    const allBookings = getBookings();
-    if (!allBookings.length) {
+    const activeBookings = getBookings();
+    const deletedBookings = getDeletedBookings();
+    if (!activeBookings.length && !deletedBookings.length) {
       toast.error("No bookings to export");
       return;
     }
@@ -126,14 +128,38 @@ const Index = () => {
       endDate.setHours(23, 59, 59, 999);
     }
 
-    const filtered = allBookings.filter((b) => {
+    const filteredActive = activeBookings.filter((b) => {
       const ci = new Date(b.checkIn);
       const co = new Date(b.checkOut);
       return (
         co.getTime() >= startDate.getTime() && ci.getTime() <= endDate.getTime()
       );
     });
-    if (!filtered.length) {
+
+    const includeDeleted = confirm(
+      "Include deleted bookings in the PDF export? Click OK to include, Cancel to exclude.",
+    );
+    let combined = [...filteredActive];
+    if (includeDeleted) {
+      const deleted = getDeletedBookings();
+      const filteredDeleted = deleted.filter((b) => {
+        const ci = new Date(b.checkIn);
+        const co = new Date(b.checkOut);
+        return (
+          co.getTime() >= startDate.getTime() &&
+          ci.getTime() <= endDate.getTime()
+        );
+      });
+      // mark deleted entries so status column shows it's deleted
+      filteredDeleted.forEach((d) => {
+        if (!String(d.status).toLowerCase().includes("deleted")) {
+          (d as any).status = `${d.status} (deleted)`;
+        }
+      });
+      combined = [...combined, ...filteredDeleted];
+    }
+
+    if (!combined.length) {
       toast.error("No bookings in selected timeline");
       return;
     }
@@ -147,23 +173,25 @@ const Index = () => {
     const startLabel = startDate.toLocaleDateString("en-IN");
     const endLabel = endDate.toLocaleDateString("en-IN");
     doc.text(`Bookings Report — ${startLabel} — ${endLabel}`, 14, 26);
+    const displayCurrency = /^[\x00-\x7F]+$/.test(s.currency || "")
+      ? s.currency
+      : "Rs";
+
     autoTable(doc, {
       startY: 32,
-      head: [
-        [
-          "Guest",
-          "Phone",
-          "Room",
-          "Check-in",
-          "Check-out",
-          "Nights",
-          "Amount",
-          "Advance",
-          "Due",
-          "Status",
-        ],
+      columns: [
+        { header: "Guest", dataKey: "guest" },
+        { header: "Phone", dataKey: "phone" },
+        { header: "Room", dataKey: "room" },
+        { header: "Check-in", dataKey: "checkIn" },
+        { header: "Check-out", dataKey: "checkOut" },
+        { header: "Nights", dataKey: "nights" },
+        { header: "Amount", dataKey: "amount" },
+        { header: "Advance", dataKey: "advance" },
+        { header: "Due", dataKey: "due" },
+        { header: "Status", dataKey: "status" },
       ],
-      body: filtered.map((b) => {
+      body: combined.map((b) => {
         const nights = Math.max(
           1,
           Math.ceil(
@@ -171,33 +199,84 @@ const Index = () => {
               86400000,
           ),
         );
-        return [
-          b.guestName,
-          b.phone || "—",
-          b.room,
-          b.checkIn,
-          b.checkOut,
+        return {
+          guest: b.guestName,
+          phone: b.phone || "—",
+          room: b.room,
+          checkIn: b.checkIn,
+          checkOut: b.checkOut,
           nights,
-          `${s.currency}${b.amount}`,
-          `${s.currency}${b.advance}`,
-          `${s.currency}${b.amount - b.advance}`,
-          b.status,
-        ];
+          amount: `${displayCurrency}${b.amount}`,
+          advance: `${displayCurrency}${b.advance}`,
+          due: `${displayCurrency}${b.amount - b.advance}`,
+          status: b.status,
+          _deleted: Boolean((b as any).deletedAt || (b as any).purgedAt),
+        };
       }),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [217, 119, 6] },
       alternateRowStyles: { fillColor: [254, 252, 232] },
+      didParseCell: (data) => {
+        try {
+          const row = data.row && (data.row.raw as any);
+          if (row && row._deleted) {
+            // light red background
+            data.cell.styles.fillColor = [255, 230, 230];
+            data.cell.styles.textColor = [156, 18, 18];
+          }
+        } catch (e) {
+          // ignore styling errors
+        }
+      },
     });
+    // compute totals excluding deleted entries
+    const totalsSource = filteredActive; // exclude deleted for totals
+    const totalAmountVal = totalsSource.reduce(
+      (s2, b) => s2 + (Number(b.amount) || 0),
+      0,
+    );
+    const totalAdvanceVal = totalsSource.reduce(
+      (s2, b) => s2 + (Number(b.advance) || 0),
+      0,
+    );
+    const totalDueVal = totalAmountVal - totalAdvanceVal;
+
+    const finalY = (doc as any).lastAutoTable?.finalY || 40;
+    const displayCurrency = /^[\x00-\x7F]+$/.test(s.currency || "")
+      ? s.currency
+      : "Rs";
+    doc.setFontSize(10);
+    doc.text(
+      `Total (excluding deleted): ${displayCurrency}${totalAmountVal.toFixed(2)}`,
+      14,
+      finalY + 10,
+    );
+    doc.text(
+      `Paid (advance): ${displayCurrency}${totalAdvanceVal.toFixed(2)}`,
+      14,
+      finalY + 16,
+    );
+    doc.text(
+      `Total Due: ${displayCurrency}${totalDueVal.toFixed(2)}`,
+      14,
+      finalY + 22,
+    );
+
     doc.save(
-      `mirchi-bookings-${startLabel.replace(/\//g, "-")}_to_${endLabel.replace(/\//g, "-")}.pdf`,
+      `mirchi-bookings-${startLabel.replace(/\//g, "-")}_to_${endLabel.replace(/\//g, "-")}${includeDeleted ? "_with-deleted" : ""}.pdf`,
     );
     toast.success("PDF downloaded!");
   };
 
   const handleExportJSON = () => {
+    const includeDeleted = confirm(
+      "Include deleted bookings in the export? Click OK to include, Cancel to exclude.",
+    );
     downloadFile(
-      exportBookingsJSON(),
-      "mirchi-bookings.json",
+      exportBookingsJSON(includeDeleted),
+      includeDeleted
+        ? "mirchi-bookings-with-deleted.json"
+        : "mirchi-bookings.json",
       "application/json",
     );
     toast.success("JSON downloaded!");
