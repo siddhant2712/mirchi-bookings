@@ -10,18 +10,24 @@ interface SimpleInvoiceGeneratorProps {
   onClose: () => void;
 }
 
-export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGeneratorProps) {
+export default function SimpleInvoiceGenerator({
+  onClose,
+}: SimpleInvoiceGeneratorProps) {
   const s = getSettings();
   const [businessName, setBusinessName] = useState(s.businessName);
   const [invoiceTitle, setInvoiceTitle] = useState(s.invoiceTitle);
   const [businessGst, setBusinessGst] = useState(s.businessGstNumber ?? "");
-  const [businessAddress, setBusinessAddress] = useState(s.businessAddress ?? "");
+  const [businessAddress, setBusinessAddress] = useState(
+    s.businessAddress ?? "",
+  );
   const [businessPhone, setBusinessPhone] = useState(s.businessContact ?? "");
   const [customerName, setCustomerName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [phone, setPhone] = useState("");
-  const [items, setItems] = useState<{ desc: string; amount: string }[]>([{ desc: "", amount: "" }]);
+  const [items, setItems] = useState<{ desc: string; amount: string }[]>([
+    { desc: "", amount: "" },
+  ]);
   const [cgstLabel, setCgstLabel] = useState(s.cgstLabel);
   const [sgstLabel, setSgstLabel] = useState(s.sgstLabel);
   const [cgstPercent, setCgstPercent] = useState(s.cgstPercent);
@@ -29,14 +35,18 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
   const [footer, setFooter] = useState(s.invoiceFooter);
 
   const addItem = () => setItems([...items, { desc: "", amount: "" }]);
-  const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  const removeItem = (idx: number) =>
+    setItems(items.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: "desc" | "amount", value: string) => {
     const n = [...items];
     n[idx] = { ...n[idx], [field]: value };
     setItems(n);
   };
 
-  const subtotal = items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+  const subtotal = items.reduce(
+    (sum, i) => sum + parseFloat(i.amount || "0"),
+    0,
+  );
   const cgstAmount = subtotal * (cgstPercent / 100);
   const sgstAmount = subtotal * (sgstPercent / 100);
   const totalTax = cgstAmount + sgstAmount;
@@ -52,7 +62,10 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
   const handlePrint = () => {
     const itemRows = items
       .filter((i) => i.desc || i.amount)
-      .map((i) => `<tr><td class="inv-desc">${escapeHtml(i.desc || "—")}</td><td class="inv-amt">${s.currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`)
+      .map(
+        (i) =>
+          `<tr><td class="inv-desc">${escapeHtml(i.desc || "—")}</td><td class="inv-amt">${s.currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`,
+      )
       .join("");
     const printBody = `
       <div class="inv-page">
@@ -148,89 +161,171 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
       <div className="flex justify-between items-center sticky top-0 bg-background py-2 border-b">
         <h3 className="text-lg font-bold">Simple Invoice Generator</h3>
         <div className="flex gap-2">
-          <Button size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-1" /> Print</Button>
-          <Button size="sm" variant="outline" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1" /> Print
+          </Button>
+          <Button size="sm" variant="outline" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="space-y-2">
           <Label>Your business name</Label>
-          <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+          <Input
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+          />
         </div>
         <div className="space-y-2">
           <Label>Invoice title</Label>
-          <Input value={invoiceTitle} onChange={(e) => setInvoiceTitle(e.target.value)} />
+          <Input
+            value={invoiceTitle}
+            onChange={(e) => setInvoiceTitle(e.target.value)}
+          />
         </div>
         <div className="space-y-2">
           <Label>Restaurant GST number</Label>
-          <Input value={businessGst} onChange={(e) => setBusinessGst(e.target.value)} placeholder="GSTIN" />
+          <Input
+            value={businessGst}
+            onChange={(e) => setBusinessGst(e.target.value)}
+            placeholder="GSTIN"
+          />
         </div>
         <div className="space-y-2">
           <Label>Restaurant phone</Label>
-          <Input value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} placeholder="Phone" />
+          <Input
+            value={businessPhone}
+            onChange={(e) => setBusinessPhone(e.target.value)}
+            placeholder="Phone"
+          />
         </div>
         <div className="space-y-2 col-span-2">
           <Label>Restaurant location / address</Label>
-          <Input value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Address" />
+          <Input
+            value={businessAddress}
+            onChange={(e) => setBusinessAddress(e.target.value)}
+            placeholder="Address"
+          />
         </div>
       </div>
 
       <div className="border-t pt-4">
         <Label className="text-muted-foreground">Bill To</Label>
         <div className="grid grid-cols-2 gap-3 mt-2">
-          <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
-          <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company name" />
-          <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="GST number" />
+          <Input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Customer name"
+          />
+          <Input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Phone"
+          />
+          <Input
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="Company name"
+          />
+          <Input
+            value={gstNumber}
+            onChange={(e) => setGstNumber(e.target.value)}
+            placeholder="GST number"
+          />
         </div>
       </div>
 
       <div>
         <div className="flex justify-between items-center mb-2">
           <Label>Line items</Label>
-          <Button type="button" variant="outline" size="sm" onClick={addItem}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+          <Button type="button" variant="outline" size="sm" onClick={addItem}>
+            <Plus className="h-4 w-4 mr-1" /> Add
+          </Button>
         </div>
         <div className="space-y-2">
           {items.map((item, idx) => (
             <div key={idx} className="flex gap-2 items-center">
-              <Input value={item.desc} onChange={(e) => updateItem(idx, "desc", e.target.value)} placeholder="Description" className="flex-1" />
-              <Input type="number" value={item.amount} onChange={(e) => updateItem(idx, "amount", e.target.value)} placeholder="Amount" className="w-28" />
-              <Button type="button" size="icon" variant="ghost" onClick={() => removeItem(idx)}><X className="h-4 w-4" /></Button>
+              <Input
+                value={item.desc}
+                onChange={(e) => updateItem(idx, "desc", e.target.value)}
+                placeholder="Description"
+                className="flex-1"
+              />
+              <Input
+                type="number"
+                value={item.amount}
+                onChange={(e) => updateItem(idx, "amount", e.target.value)}
+                placeholder="Amount"
+                className="w-28"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => removeItem(idx)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 mt-2">
           <div className="flex gap-2 items-center">
             <Label className="w-20">{cgstLabel} (%)</Label>
-            <Input type="number" value={cgstPercent} onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)} placeholder="0" className="w-20" />
+            <Input
+              type="number"
+              value={cgstPercent}
+              onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              className="w-20"
+            />
           </div>
           <div className="flex gap-2 items-center">
             <Label className="w-20">{sgstLabel} (%)</Label>
-            <Input type="number" value={sgstPercent} onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)} placeholder="0" className="w-20" />
+            <Input
+              type="number"
+              value={sgstPercent}
+              onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              className="w-20"
+            />
           </div>
         </div>
       </div>
 
       <div className="text-sm text-muted-foreground">
         <Label>Footer text</Label>
-        <Textarea value={footer} onChange={(e) => setFooter(e.target.value)} rows={2} className="mt-1" />
+        <Textarea
+          value={footer}
+          onChange={(e) => setFooter(e.target.value)}
+          rows={2}
+          className="mt-1"
+        />
       </div>
 
       {/* Preview (content used for print) - real bill format */}
-      <div id="simple-invoice-print" className="bg-muted/30 border rounded-lg p-6 text-sm">
+      <div
+        id="simple-invoice-print"
+        className="bg-muted/30 border rounded-lg p-6 text-sm"
+      >
         <div className="text-center mb-4 pb-3 border-b border-border">
           <h1 className="text-2xl font-bold">{businessName}</h1>
           <p className="text-muted-foreground text-sm">{invoiceTitle}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-            <p className="font-medium text-foreground/90">GSTIN: {businessGst || "—"}</p>
+            <p className="font-medium text-foreground/90">
+              GSTIN: {businessGst || "—"}
+            </p>
             <p>Location: {businessAddress || "—"}</p>
             <p>Ph: {businessPhone || "—"}</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <p className="text-muted-foreground text-xs uppercase">Bill To / Customer</p>
+            <p className="text-muted-foreground text-xs uppercase">
+              Bill To / Customer
+            </p>
             <p className="font-semibold">{customerName || "—"}</p>
             <p className="text-muted-foreground">Ph: {phone || "—"}</p>
             <p>Company: {companyName || "—"}</p>
@@ -239,7 +334,9 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
           <div className="text-right">
             <p className="text-muted-foreground">Invoice #</p>
             <p className="font-semibold">{invoiceId}</p>
-            <p className="text-muted-foreground">{new Date().toLocaleDateString("en-IN")}</p>
+            <p className="text-muted-foreground">
+              {new Date().toLocaleDateString("en-IN")}
+            </p>
           </div>
         </div>
         <table className="w-full">
@@ -250,34 +347,60 @@ export default function SimpleInvoiceGenerator({ onClose }: SimpleInvoiceGenerat
             </tr>
           </thead>
           <tbody>
-            {items.filter((i) => i.desc || i.amount).map((item, idx) => (
-              <tr key={idx} className="border-b">
-                <td className="py-2">{item.desc || "—"}</td>
-                <td className="py-2 text-right">{s.currency}{parseFloat(item.amount || "0").toFixed(2)}</td>
-              </tr>
-            ))}
+            {items
+              .filter((i) => i.desc || i.amount)
+              .map((item, idx) => (
+                <tr key={idx} className="border-b">
+                  <td className="py-2">{item.desc || "—"}</td>
+                  <td className="py-2 text-right">
+                    {s.currency}
+                    {parseFloat(item.amount || "0").toFixed(2)}
+                  </td>
+                </tr>
+              ))}
             <tr className="border-b">
               <td className="py-2">Subtotal</td>
-              <td className="py-2 text-right">{s.currency}{subtotal.toFixed(2)}</td>
+              <td className="py-2 text-right">
+                {s.currency}
+                {subtotal.toFixed(2)}
+              </td>
             </tr>
             <tr className="border-b">
-              <td className="py-2 text-muted-foreground">{cgstLabel} ({cgstPercent}%)</td>
-              <td className="py-2 text-right text-muted-foreground">{s.currency}{cgstAmount.toFixed(2)}</td>
+              <td className="py-2 text-muted-foreground">
+                {cgstLabel} ({cgstPercent}%)
+              </td>
+              <td className="py-2 text-right text-muted-foreground">
+                {s.currency}
+                {cgstAmount.toFixed(2)}
+              </td>
             </tr>
             <tr className="border-b">
-              <td className="py-2 text-muted-foreground">{sgstLabel} ({sgstPercent}%)</td>
-              <td className="py-2 text-right text-muted-foreground">{s.currency}{sgstAmount.toFixed(2)}</td>
+              <td className="py-2 text-muted-foreground">
+                {sgstLabel} ({sgstPercent}%)
+              </td>
+              <td className="py-2 text-right text-muted-foreground">
+                {s.currency}
+                {sgstAmount.toFixed(2)}
+              </td>
             </tr>
             <tr>
               <td className="py-2 font-bold">Total</td>
-              <td className="py-2 text-right font-bold">{s.currency}{total.toFixed(2)}</td>
+              <td className="py-2 text-right font-bold">
+                {s.currency}
+                {total.toFixed(2)}
+              </td>
             </tr>
           </tbody>
         </table>
-        <p className="text-center text-muted-foreground text-xs mt-4">{footer}</p>
+        <p className="text-center text-muted-foreground text-xs mt-4">
+          {footer}
+        </p>
       </div>
 
-      <p className="text-xs text-muted-foreground">Fill the form above and click Print. The invoice will open in a new window for printing.</p>
+      <p className="text-xs text-muted-foreground">
+        Fill the form above and click Print. The invoice will open in a new
+        window for printing.
+      </p>
     </div>
   );
 }

@@ -6,12 +6,16 @@ import path from "path";
 export default defineConfig({
   server: {
     host: "::",
-    port: 8080,
+    port: 9000,
+    strictPort: true,
     hmr: {
       overlay: false,
     },
   },
   plugins: [react()],
+  optimizeDeps: {
+    include: ["canvg"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
