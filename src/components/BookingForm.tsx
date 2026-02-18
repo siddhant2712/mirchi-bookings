@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Booking, ROOMS } from "@/lib/types";
+import { Booking } from "@/lib/types";
 import { saveBooking, isRoomAvailable } from "@/lib/bookingStore";
-import { getSettings, getRoomRate } from "@/lib/settingsStore";
+import { getSettings, getRoomRate, getRooms } from "@/lib/settingsStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ interface BookingFormProps {
 }
 
 export default function BookingForm({ initialRoom, editBooking, onDone }: BookingFormProps) {
+  const ROOMS = getRooms();
   const [guestName, setGuestName] = useState(editBooking?.guestName ?? "");
   const [phone, setPhone] = useState(editBooking?.phone ?? "");
   const [selectedRooms, setSelectedRooms] = useState<string[]>(
