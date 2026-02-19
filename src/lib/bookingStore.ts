@@ -28,6 +28,7 @@ export function saveBooking(booking: Booking): void {
   if (idx >= 0) bookings[idx] = booking;
   else bookings.push(booking);
   setItem(STORAGE_KEY, JSON.stringify(bookings));
+  try { window.dispatchEvent(new Event("bookings-updated")); } catch {}
 }
 
 export function deleteBooking(id: string): void {
@@ -41,6 +42,7 @@ export function deleteBooking(id: string): void {
     setItem(DELETED_KEY, JSON.stringify(deleted));
   }
   setItem(STORAGE_KEY, JSON.stringify(remaining));
+  try { window.dispatchEvent(new Event("bookings-updated")); } catch {}
 }
 
 export function restoreDeletedBooking(id: string): void {
@@ -56,6 +58,7 @@ export function restoreDeletedBooking(id: string): void {
   bookings.push(item);
   setItem(STORAGE_KEY, JSON.stringify(bookings));
   setItem(DELETED_KEY, JSON.stringify(deleted));
+  try { window.dispatchEvent(new Event("bookings-updated")); } catch {}
 }
 
 export function purgeDeletedBooking(id: string): void {
@@ -66,6 +69,7 @@ export function purgeDeletedBooking(id: string): void {
   (item as any).purgedAt = new Date().toISOString();
   deleted[idx] = item;
   setItem(DELETED_KEY, JSON.stringify(deleted));
+  try { window.dispatchEvent(new Event("bookings-updated")); } catch {}
 }
 
 export function clearAllBookings(): void {
@@ -77,6 +81,7 @@ export function clearAllBookings(): void {
     setItem(DELETED_KEY, JSON.stringify([...deleted, ...bookings]));
   }
   removeItem(STORAGE_KEY);
+  try { window.dispatchEvent(new Event("bookings-updated")); } catch {}
 }
 
 export function exportBookingsJSON(includeDeleted = false): string {

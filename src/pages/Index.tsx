@@ -25,6 +25,7 @@ import {
   CalendarDays,
   ListChecks,
   Trash2,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ import RoomGrid from "@/components/RoomGrid";
 import BookingForm from "@/components/BookingForm";
 import BookingsList from "@/components/BookingsList";
 import InvoiceView from "@/components/InvoiceView";
+import RevenueView from "@/components/RevenueView";
 import SettingsMenu from "@/components/SettingsMenu";
 import SimpleInvoiceGenerator from "@/components/SimpleInvoiceGenerator";
 import CalendarView from "@/components/CalendarView";
@@ -298,7 +300,7 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                🌶️ Mirchi Hotel
+                Mirchi Hotel
               </h1>
               <p className="text-xs text-muted-foreground">
                 Booking Management
@@ -385,13 +387,13 @@ const Index = () => {
         </div>
       </div>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 pb-20">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-xl grid-cols-4 h-12 rounded-xl bg-muted/50 p-1.5 shadow-inner">
+          <TabsList className="grid w-full max-w-xl grid-cols-5 h-12 rounded-xl bg-muted/50 p-1.5 shadow-inner">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
             </TabsTrigger>
@@ -400,6 +402,9 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="calendar" className="flex items-center gap-2">
               <CalendarDays className="h-4 w-4" /> Calendar
+            </TabsTrigger>
+            <TabsTrigger value="revenue" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Revenue
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" /> Settings
@@ -506,7 +511,10 @@ const Index = () => {
               <CardContent className="pt-4">
                 <BookingsList
                   onEdit={handleEdit}
-                  onInvoice={setInvoiceBooking}
+                  onInvoice={(b) => {
+                    setInvoiceBooking(b);
+                    setActiveTab("dashboard");
+                  }}
                   onCheckInOut={switchToBookings}
                   refreshKey={refreshKey}
                 />
@@ -516,6 +524,13 @@ const Index = () => {
 
           <TabsContent value="calendar" className="mt-0">
             <CalendarView refreshKey={refreshKey} />
+          </TabsContent>
+
+          <TabsContent value="revenue" className="mt-0">
+            <div className="mt-2">
+              {/* lazy-load component */}
+              <RevenueView />
+            </div>
           </TabsContent>
 
           <TabsContent value="settings" className="mt-0">
@@ -585,24 +600,32 @@ const Index = () => {
 
       {/* Booking Form Dialog */}
       <Dialog
-        open={showForm}
-        onOpenChange={(open) => {
-          if (!open) handleFormDone();
-        }}
-      >
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editBooking ? "Edit Booking" : "New Booking"}
-            </DialogTitle>
-          </DialogHeader>
-          <BookingForm
-            initialRoom={selectedRoom}
-            editBooking={editBooking}
-            onDone={handleFormDone}
-          />
-        </DialogContent>
-      </Dialog>
+  open={showForm}
+  onOpenChange={(open) => {
+    if (!open) handleFormDone();
+  }}
+>
+  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>
+        {editBooking ? "Edit Booking" : "New Booking"}
+      </DialogTitle>
+    </DialogHeader>
+    <BookingForm
+      initialRoom={selectedRoom}
+      editBooking={editBooking}
+      onDone={handleFormDone}
+    />
+  </DialogContent>
+</Dialog>
+
+{/* ✅ Footer should be OUTSIDE */}
+<footer className=" w-full bg-background/95 border-t border-border z-50 shadow-sm">
+  <div className="container mx-auto px-4 py-3 text-center text-sm text-foreground">
+    <span className="font-medium">Made with ❤️ by Siddhant</span>
+  </div>
+</footer>
+
     </div>
   );
 };

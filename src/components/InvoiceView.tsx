@@ -78,13 +78,24 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setGstNumber(booking.guestGstNumber ?? "");
   }, [booking.id]);
 
-  const subtotal =
-    parseFloat(totalAmount || "0") +
-    extraItems.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
-  const cgstAmount = subtotal * (cgstPercent / 100);
-  const sgstAmount = subtotal * (sgstPercent / 100);
+  // If the user entered a total amount for the room (inclusive of taxes),
+  // derive the room's pre-tax price so that: roomPreTax + taxesOnRoom = enteredRoomTotal.
+  // Extra items are treated as pre-tax amounts and taxed together with the room pre-tax.
+  const enteredRoomTotal = parseFloat(totalAmount || "0");
+  const extrasGross = extraItems.reduce(
+    (sum, i) => sum + parseFloat(i.amount || "0"),
+    0,
+  );
+  const gross = enteredRoomTotal + extrasGross; // displayed subtotal / total
+  const totalTaxRate = (cgstPercent + sgstPercent) / 100;
+  const preTaxBase = totalTaxRate > 0 ? gross / (1 + totalTaxRate) : gross;
+  const preTaxRoom =
+    totalTaxRate > 0 ? enteredRoomTotal / (1 + totalTaxRate) : enteredRoomTotal;
+  const cgstAmount = preTaxBase * (cgstPercent / 100);
+  const sgstAmount = preTaxBase * (sgstPercent / 100);
   const totalTax = cgstAmount + sgstAmount;
-  const total = subtotal + totalTax;
+  const subtotal = gross; // show gross as subtotal (tax-inclusive)
+  const total = gross; // total equals entered gross
   const balance = total - parseFloat(advancePaid || "0");
 
   const addExtraItem = () =>
@@ -100,7 +111,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
   const handlePrint = () => {
     const lineRows = [
-      `<tr><td class="inv-desc">${escapeHtml(description)}<br><span class="inv-muted">${escapeHtml(dateRange)}</span></td><td class="inv-amt">${currency}${parseFloat(totalAmount).toFixed(2)}</td></tr>`,
+      `<tr><td class="inv-desc">${escapeHtml(description)}<br><span class="inv-muted">${escapeHtml(dateRange)}</span></td><td class="inv-amt">${currency}${preTaxRoom.toFixed(2)}</td></tr>`,
       ...extraItems
         .filter((i) => i.desc || i.amount)
         .map(
@@ -229,10 +240,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     doc.text(invoiceTitle || "Invoice", 14, 26);
 
     const rows: any[] = [];
-    rows.push([
-      description,
-      currency + parseFloat(totalAmount || "0").toFixed(2),
-    ]);
+    rows.push([description, currency + preTaxRoom.toFixed(2)]);
     extraItems
       .filter((i) => i.desc || i.amount)
       .forEach((it) => {
@@ -475,7 +483,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
                 ) : (
                   <span className="font-medium">
                     {currency}
-                    {parseFloat(totalAmount).toFixed(2)}
+                    {preTaxRoom.toFixed(2)}
                   </span>
                 )}
               </td>

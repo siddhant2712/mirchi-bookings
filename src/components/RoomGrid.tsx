@@ -7,22 +7,33 @@ interface RoomGridProps {
   selectedDate?: Date;
 }
 
-export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) {
+export default function RoomGrid({
+  onSelectRoom,
+  selectedDate,
+}: RoomGridProps) {
   const bookings = getBookings();
   const rooms = getRooms();
   const targetDate = selectedDate
-    ? selectedDate.toISOString().split("T")[0]
-    : new Date().toISOString().split("T")[0];
+    ? new Date(selectedDate.setHours(0, 0, 0, 0))
+    : new Date(new Date().setHours(0, 0, 0, 0));
 
   const getStatus = (roomId: string) => {
-    const active = bookings.find(
-      (b) =>
-        b.room === roomId &&
-        b.status !== "checked-out" &&
-        b.status !== "cancelled" &&
-        b.checkIn <= targetDate &&
-        b.checkOut > targetDate
-    );
+    const active = bookings.find((b) => {
+      if (b.room !== roomId) return false;
+      if (b.status === "checked-out" || b.status === "cancelled") return false;
+      try {
+        const inDate = new Date(b.checkIn);
+        const outDate = new Date(b.checkOut);
+        inDate.setHours(0, 0, 0, 0);
+        outDate.setHours(0, 0, 0, 0);
+        return (
+          inDate.getTime() <= targetDate.getTime() &&
+          outDate.getTime() > targetDate.getTime()
+        );
+      } catch {
+        return false;
+      }
+    });
     if (active?.status === "checked-in") return "occupied";
     if (active?.status === "confirmed") return "reserved";
     return "available";
@@ -35,7 +46,7 @@ export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) 
         b.status !== "checked-out" &&
         b.status !== "cancelled" &&
         b.checkIn <= targetDate &&
-        b.checkOut > targetDate
+        b.checkOut > targetDate,
     );
     return active?.guestName;
   };
@@ -48,9 +59,14 @@ export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) 
         const statusColors = {
           available: "bg-success/10 border-success/30 hover:border-success",
           reserved: "bg-warning/10 border-warning/30 hover:border-warning",
-          occupied: "bg-destructive/10 border-destructive/30 hover:border-destructive",
+          occupied:
+            "bg-destructive/10 border-destructive/30 hover:border-destructive",
         };
-        const statusLabels = { available: "Available", reserved: "Reserved", occupied: "Occupied" };
+        const statusLabels = {
+          available: "Available",
+          reserved: "Reserved",
+          occupied: "Occupied",
+        };
 
         return (
           <button
@@ -63,13 +79,23 @@ export default function RoomGrid({ onSelectRoom, selectedDate }: RoomGridProps) 
             ) : (
               <PartyPopper className="h-8 w-8 text-foreground/70" />
             )}
-            <span className="font-bold text-base text-foreground">{room.label}</span>
-            {guest && <span className="text-xs text-foreground/60 truncate max-w-full">{guest}</span>}
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-              status === "available" ? "bg-success text-success-foreground" :
-              status === "reserved" ? "bg-warning text-warning-foreground" :
-              "bg-destructive text-destructive-foreground"
-            }`}>
+            <span className="font-bold text-base text-foreground">
+              {room.label}
+            </span>
+            {guest && (
+              <span className="text-xs text-foreground/60 truncate max-w-full">
+                {guest}
+              </span>
+            )}
+            <span
+              className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                status === "available"
+                  ? "bg-success text-success-foreground"
+                  : status === "reserved"
+                    ? "bg-warning text-warning-foreground"
+                    : "bg-destructive text-destructive-foreground"
+              }`}
+            >
               {statusLabels[status]}
             </span>
           </button>

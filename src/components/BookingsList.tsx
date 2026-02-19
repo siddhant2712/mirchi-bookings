@@ -263,6 +263,7 @@ export default function BookingsList({
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40 border-b-2 border-border">
                 <TableHead className="font-semibold">Guest</TableHead>
+                <TableHead className="font-semibold">Booked</TableHead>
                 <TableHead className="font-semibold">Room</TableHead>
                 <TableHead className="font-semibold">Check-in</TableHead>
                 <TableHead className="font-semibold">Check-out</TableHead>
@@ -297,6 +298,17 @@ export default function BookingsList({
                       {b.phone && (
                         <span className="block text-xs text-muted-foreground">
                           {b.phone}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {b.bookingDate ? (
+                        <span>
+                          {format(new Date(b.bookingDate), "dd MMM yyyy")}
+                        </span>
+                      ) : (
+                        <span>
+                          {format(new Date(b.createdAt), "dd MMM yyyy")}
                         </span>
                       )}
                     </TableCell>

@@ -11,6 +11,8 @@ export interface Booking {
   advance: number;
   status: "confirmed" | "checked-in" | "checked-out" | "cancelled";
   createdAt: string;
+  /** When the booking was made */
+  bookingDate?: string;
   notes?: string;
   /** Customer's company name (for invoice) */
   guestCompanyName?: string;

@@ -121,6 +121,7 @@ export default function BookingForm({
         checkOut: checkOutStr,
         amount: parseFloat(amount),
         advance: parseFloat(advance || "0"),
+        bookingDate: editBooking?.bookingDate ?? editBooking?.createdAt,
         notes,
         guestCompanyName: guestCompanyName || undefined,
         guestGstNumber: guestGstNumber || undefined,
@@ -146,6 +147,7 @@ export default function BookingForm({
               : Math.round(perRoomAdvance),
           status: "confirmed",
           createdAt: new Date().toISOString(),
+          bookingDate: new Date().toISOString(),
           notes,
           guestCompanyName: guestCompanyName || undefined,
           guestGstNumber: guestGstNumber || undefined,
@@ -296,11 +298,15 @@ export default function BookingForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>
-            Total Amount ({currency}) *
+            Total Amount (gross, incl. taxes) ({currency}) *
             {!isEditing && selectedRooms.length > 1
               ? ` (split across ${selectedRooms.length} rooms)`
               : ""}
           </Label>
+          <p className="text-xs text-muted-foreground">
+            Enter the total amount including taxes. The invoice will show the
+            pre-tax breakdown (CGST/SGST) automatically.
+          </p>
           {!isEditing && suggestedTotal > 0 && (
             <p className="text-xs text-muted-foreground">
               From rates:{" "}

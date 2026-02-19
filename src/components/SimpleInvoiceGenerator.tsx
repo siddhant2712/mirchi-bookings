@@ -43,14 +43,16 @@ export default function SimpleInvoiceGenerator({
     setItems(n);
   };
 
-  const subtotal = items.reduce(
-    (sum, i) => sum + parseFloat(i.amount || "0"),
-    0,
-  );
-  const cgstAmount = subtotal * (cgstPercent / 100);
-  const sgstAmount = subtotal * (sgstPercent / 100);
+  // Treat the entered items sum as tax-inclusive gross. Back-calculate pre-tax
+  // base so taxes are shown as portions of the gross and Total equals gross.
+  const gross = items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+  const totalTaxRate = (cgstPercent + sgstPercent) / 100;
+  const preTaxBase = totalTaxRate > 0 ? gross / (1 + totalTaxRate) : gross;
+  const cgstAmount = preTaxBase * (cgstPercent / 100);
+  const sgstAmount = preTaxBase * (sgstPercent / 100);
   const totalTax = cgstAmount + sgstAmount;
-  const total = subtotal + totalTax;
+  const subtotal = gross; // display gross as subtotal (tax-inclusive)
+  const total = gross;
   const invoiceId = "INV-" + Date.now().toString(36).toUpperCase();
 
   function escapeHtml(text: string): string {

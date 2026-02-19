@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, addDays, startOfDay } from "date-fns";
 import { getBookings } from "@/lib/bookingStore";
-import { ROOMS } from "@/lib/types";
+import { getRooms } from "@/lib/settingsStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -124,7 +124,7 @@ export default function CalendarView({ refreshKey = 0 }: CalendarViewProps) {
               </tr>
             </thead>
             <tbody>
-              {ROOMS.map((room) => (
+              {getRooms().map((room) => (
                 <tr key={room.id} className="border-b hover:bg-muted/30">
                   <td className="sticky left-0 z-10 p-2 font-medium border-r bg-card whitespace-nowrap">
                     {room.label}

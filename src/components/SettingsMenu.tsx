@@ -365,56 +365,44 @@ export default function SettingsMenu() {
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="show-tax"
-              checked={settings.showTaxInRevenue}
-              onCheckedChange={(v) => update({ showTaxInRevenue: v })}
-            />
-            <Label htmlFor="show-tax">Show tax breakdown</Label>
-          </div>
           <Separator />
           <div className="space-y-1 text-sm">
-            {settings.showTaxInRevenue && (
-              <>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Revenue (ex tax)</span>
-                  <span>
-                    {settings.currency}
-                    {revenueExTax.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>
-                    {settings.cgstLabel} ({settings.cgstPercent}%)
-                  </span>
-                  <span>
-                    {settings.currency}
-                    {cgstAmount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>
-                    {settings.sgstLabel} ({settings.sgstPercent}%)
-                  </span>
-                  <span>
-                    {settings.currency}
-                    {sgstAmount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground border-t pt-1">
-                  <span>
-                    Total Tax (
-                    {(settings.cgstPercent || 0) + (settings.sgstPercent || 0)}
-                    %)
-                  </span>
-                  <span>
-                    {settings.currency}
-                    {taxAmount.toFixed(2)}
-                  </span>
-                </div>
-              </>
-            )}
+            <div className="flex justify-between text-muted-foreground">
+              <span>Revenue (ex tax)</span>
+              <span>
+                {settings.currency}
+                {revenueExTax.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>
+                {settings.cgstLabel} ({settings.cgstPercent}%)
+              </span>
+              <span>
+                {settings.currency}
+                {cgstAmount.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>
+                {settings.sgstLabel} ({settings.sgstPercent}%)
+              </span>
+              <span>
+                {settings.currency}
+                {sgstAmount.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between text-muted-foreground border-t pt-1">
+              <span>
+                Total Tax (
+                {(settings.cgstPercent || 0) + (settings.sgstPercent || 0)}
+                %)
+              </span>
+              <span>
+                {settings.currency}
+                {taxAmount.toFixed(2)}
+              </span>
+            </div>
             <div className="flex justify-between font-semibold text-base pt-1">
               <span className="flex items-center gap-1">
                 <TrendingUp className="h-4 w-4" /> Total
