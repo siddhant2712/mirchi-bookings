@@ -43,15 +43,13 @@ export default function SimpleInvoiceGenerator({
     setItems(n);
   };
 
-  // Treat the entered items sum as tax-inclusive gross. Back-calculate pre-tax
-  // base so taxes are shown as portions of the gross and Total equals gross.
+  // Room prices are tax-inclusive (gross amounts)
   const gross = items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
   const totalTaxRate = (cgstPercent + sgstPercent) / 100;
   const preTaxBase = totalTaxRate > 0 ? gross / (1 + totalTaxRate) : gross;
   const cgstAmount = preTaxBase * (cgstPercent / 100);
   const sgstAmount = preTaxBase * (sgstPercent / 100);
-  const totalTax = cgstAmount + sgstAmount;
-  const subtotal = gross; // display gross as subtotal (tax-inclusive)
+  const subtotal = gross; // Show gross as subtotal (tax-inclusive)
   const total = gross;
   const invoiceId = "INV-" + Date.now().toString(36).toUpperCase();
 
@@ -66,51 +64,53 @@ export default function SimpleInvoiceGenerator({
       .filter((i) => i.desc || i.amount)
       .map(
         (i) =>
-          `<tr><td class="inv-desc">${escapeHtml(i.desc || "—")}</td><td class="inv-amt">${s.currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`,
+          `<tr><td class="inv-desc">${escapeHtml(i.desc || "—")}</td><td class="inv-amt">${s.currency}${parseFloat(i.amount || "0").toFixed(2)} (incl. taxes)</td></tr>`,
       )
       .join("");
+    
     const printBody = `
       <div class="inv-page">
         <div class="inv-letterhead">
-          <div class="inv-letterhead-inner">
-            <h1 class="inv-brand">${escapeHtml(businessName)}</h1>
-            <p class="inv-doctitle">${escapeHtml(invoiceTitle)}</p>
-            <div class="inv-business-details">
-              <p class="inv-gst">GSTIN: ${escapeHtml(businessGst || "—")}</p>
-              <p class="inv-address">Location: ${escapeHtml(businessAddress || "—")}</p>
-              <p class="inv-phone">Ph: ${escapeHtml(businessPhone || "—")}</p>
-            </div>
-          </div>
+         <div class="inv-letterhead-inner">
+           <h1 class="inv-brand">${escapeHtml(businessName)}</h1>
+           <p class="inv-doctitle">${escapeHtml(invoiceTitle)}</p>
+           <div class="inv-business-details">
+             <p class="inv-gst">GSTIN: ${escapeHtml(businessGst || "—")}</p>
+             <p class="inv-address">Location: ${escapeHtml(businessAddress || "—")}</p>
+             <p class="inv-phone">Ph: ${escapeHtml(businessPhone || "—")}</p>
+           </div>
+         </div>
         </div>
         <div class="inv-meta">
-          <div class="inv-billto">
-            <p class="inv-label">Bill To / Customer</p>
-            <p class="inv-guest">${escapeHtml(customerName || "—")}</p>
-            <p class="inv-muted">Ph: ${escapeHtml(phone || "—")}</p>
-            <p class="inv-company">Company: ${escapeHtml(companyName || "—")}</p>
-            <p class="inv-muted">GST: ${escapeHtml(gstNumber || "—")}</p>
-          </div>
-          <div class="inv-invoice-meta">
-            <table class="inv-meta-table">
-              <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${invoiceId}</td></tr>
-              <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
-            </table>
-          </div>
+         <div class="inv-billto">
+           <p class="inv-label">Bill To / Customer</p>
+           <p class="inv-guest">${escapeHtml(customerName || "—")}</p>
+           <p class="inv-muted">Ph: ${escapeHtml(phone || "—")}</p>
+           <p class="inv-company">Company: ${escapeHtml(companyName || "—")}</p>
+           <p class="inv-muted">GST: ${escapeHtml(gstNumber || "—")}</p>
+         </div>
+         <div class="inv-invoice-meta">
+           <table class="inv-meta-table">
+             <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${invoiceId}</td></tr>
+             <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
+           </table>
+         </div>
         </div>
         <table class="inv-table">
-          <thead>
-            <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount</th></tr>
-          </thead>
-          <tbody>
-            ${itemRows}
-            <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
-            <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
-            <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
-            <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
-          </tbody>
+         <thead>
+           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (incl. taxes)</th></tr>
+         </thead>
+         <tbody>
+           ${itemRows}
+           <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
+           <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
+           <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
+           <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
+         </tbody>
         </table>
         <div class="inv-footer"><p>${escapeHtml(footer)}</p></div>
       </div>`;
+    
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`
@@ -241,7 +241,7 @@ export default function SimpleInvoiceGenerator({
 
       <div>
         <div className="flex justify-between items-center mb-2">
-          <Label>Line items</Label>
+          <Label>Line items (tax-inclusive room prices)</Label>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
@@ -252,15 +252,15 @@ export default function SimpleInvoiceGenerator({
               <Input
                 value={item.desc}
                 onChange={(e) => updateItem(idx, "desc", e.target.value)}
-                placeholder="Description"
+                placeholder="Room/Description"
                 className="flex-1"
               />
               <Input
                 type="number"
                 value={item.amount}
                 onChange={(e) => updateItem(idx, "amount", e.target.value)}
-                placeholder="Amount"
-                className="w-28"
+                placeholder="Total Amount (incl. taxes)"
+                className="w-36"
               />
               <Button
                 type="button"
@@ -280,7 +280,7 @@ export default function SimpleInvoiceGenerator({
               type="number"
               value={cgstPercent}
               onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)}
-              placeholder="0"
+              placeholder="9"
               className="w-20"
             />
           </div>
@@ -290,7 +290,7 @@ export default function SimpleInvoiceGenerator({
               type="number"
               value={sgstPercent}
               onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)}
-              placeholder="0"
+              placeholder="9"
               className="w-20"
             />
           </div>
@@ -307,7 +307,7 @@ export default function SimpleInvoiceGenerator({
         />
       </div>
 
-      {/* Preview (content used for print) - real bill format */}
+      {/* Preview */}
       <div
         id="simple-invoice-print"
         className="bg-muted/30 border rounded-lg p-6 text-sm"
@@ -345,7 +345,7 @@ export default function SimpleInvoiceGenerator({
           <thead>
             <tr className="border-b">
               <th className="text-left py-2">Description</th>
-              <th className="text-right py-2">Amount ({s.currency})</th>
+              <th className="text-right py-2">Amount (incl. taxes)</th>
             </tr>
           </thead>
           <tbody>
@@ -400,8 +400,7 @@ export default function SimpleInvoiceGenerator({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Fill the form above and click Print. The invoice will open in a new
-        window for printing.
+        Enter room prices inclusive of taxes. Taxes are automatically back-calculated and shown separately. Click Print to generate the invoice.
       </p>
     </div>
   );
