@@ -17,9 +17,7 @@ export default function SimpleInvoiceGenerator({
   const [businessName, setBusinessName] = useState(s.businessName);
   const [invoiceTitle, setInvoiceTitle] = useState(s.invoiceTitle);
   const [businessGst, setBusinessGst] = useState(s.businessGstNumber ?? "");
-  const [businessAddress, setBusinessAddress] = useState(
-    s.businessAddress ?? "",
-  );
+  const [businessAddress, setBusinessAddress] = useState(s.businessAddress ?? "");
   const [businessPhone, setBusinessPhone] = useState(s.businessContact ?? "");
   const [customerName, setCustomerName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -35,22 +33,29 @@ export default function SimpleInvoiceGenerator({
   const [footer, setFooter] = useState(s.invoiceFooter);
 
   const addItem = () => setItems([...items, { desc: "", amount: "" }]);
-  const removeItem = (idx: number) =>
-    setItems(items.filter((_, i) => i !== idx));
+  const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: "desc" | "amount", value: string) => {
     const n = [...items];
     n[idx] = { ...n[idx], [field]: value };
     setItems(n);
   };
 
-  // Room prices are tax-inclusive (gross amounts)
-  const gross = items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+  // --- CALCULATION LOGIC ---
+  const round = (n: number) => Math.round(n * 100) / 100;
   const totalTaxRate = (cgstPercent + sgstPercent) / 100;
-  const preTaxBase = totalTaxRate > 0 ? gross / (1 + totalTaxRate) : gross;
-  const cgstAmount = preTaxBase * (cgstPercent / 100);
-  const sgstAmount = preTaxBase * (sgstPercent / 100);
-  const subtotal = gross; // Show gross as subtotal (tax-inclusive)
-  const total = gross;
+
+  // Process items to get Pre-Tax values for display
+  const processedItems = items.map(item => {
+    const grossVal = parseFloat(item.amount || "0");
+    const preTaxVal = totalTaxRate > 0 ? round(grossVal / (1 + totalTaxRate)) : grossVal;
+    return { ...item, preTax: preTaxVal, gross: grossVal };
+  });
+
+  const subtotal = round(processedItems.reduce((sum, i) => sum + i.preTax, 0));
+  const cgstAmount = round(subtotal * (cgstPercent / 100));
+  const sgstAmount = round(subtotal * (sgstPercent / 100));
+  const total = round(subtotal + cgstAmount + sgstAmount);
+  
   const invoiceId = "INV-" + Date.now().toString(36).toUpperCase();
 
   function escapeHtml(text: string): string {
@@ -60,11 +65,14 @@ export default function SimpleInvoiceGenerator({
   }
 
   const handlePrint = () => {
-    const itemRows = items
+    const itemRows = processedItems
       .filter((i) => i.desc || i.amount)
       .map(
         (i) =>
-          `<tr><td class="inv-desc">${escapeHtml(i.desc || "—")}</td><td class="inv-amt">${s.currency}${parseFloat(i.amount || "0").toFixed(2)} (incl. taxes)</td></tr>`,
+          `<tr>
+            <td class="inv-desc">${escapeHtml(i.desc || "—")}</td>
+            <td class="inv-amt">${s.currency}${i.preTax.toFixed(2)}</td>
+          </tr>`,
       )
       .join("");
     
@@ -98,7 +106,7 @@ export default function SimpleInvoiceGenerator({
         </div>
         <table class="inv-table">
          <thead>
-           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (incl. taxes)</th></tr>
+           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (Excl. Tax)</th></tr>
          </thead>
          <tbody>
            ${itemRows}
@@ -175,73 +183,39 @@ export default function SimpleInvoiceGenerator({
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="space-y-2">
           <Label>Your business name</Label>
-          <Input
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-          />
+          <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>Invoice title</Label>
-          <Input
-            value={invoiceTitle}
-            onChange={(e) => setInvoiceTitle(e.target.value)}
-          />
+          <Input value={invoiceTitle} onChange={(e) => setInvoiceTitle(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>Restaurant GST number</Label>
-          <Input
-            value={businessGst}
-            onChange={(e) => setBusinessGst(e.target.value)}
-            placeholder="GSTIN"
-          />
+          <Input value={businessGst} onChange={(e) => setBusinessGst(e.target.value)} placeholder="GSTIN" />
         </div>
         <div className="space-y-2">
           <Label>Restaurant phone</Label>
-          <Input
-            value={businessPhone}
-            onChange={(e) => setBusinessPhone(e.target.value)}
-            placeholder="Phone"
-          />
+          <Input value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} placeholder="Phone" />
         </div>
         <div className="space-y-2 col-span-2">
           <Label>Restaurant location / address</Label>
-          <Input
-            value={businessAddress}
-            onChange={(e) => setBusinessAddress(e.target.value)}
-            placeholder="Address"
-          />
+          <Input value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Address" />
         </div>
       </div>
 
       <div className="border-t pt-4">
         <Label className="text-muted-foreground">Bill To</Label>
         <div className="grid grid-cols-2 gap-3 mt-2">
-          <Input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Customer name"
-          />
-          <Input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Phone"
-          />
-          <Input
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            placeholder="Company name"
-          />
-          <Input
-            value={gstNumber}
-            onChange={(e) => setGstNumber(e.target.value)}
-            placeholder="GST number"
-          />
+          <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
+          <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company name" />
+          <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="GST number" />
         </div>
       </div>
 
       <div>
         <div className="flex justify-between items-center mb-2">
-          <Label>Line items (tax-inclusive room prices)</Label>
+          <Label>Line items (Input total price including tax)</Label>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
@@ -259,15 +233,10 @@ export default function SimpleInvoiceGenerator({
                 type="number"
                 value={item.amount}
                 onChange={(e) => updateItem(idx, "amount", e.target.value)}
-                placeholder="Total Amount (incl. taxes)"
+                placeholder="Total (Incl. Tax)"
                 className="w-36"
               />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => removeItem(idx)}
-              >
+              <Button type="button" size="icon" variant="ghost" onClick={() => removeItem(idx)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -280,7 +249,6 @@ export default function SimpleInvoiceGenerator({
               type="number"
               value={cgstPercent}
               onChange={(e) => setCgstPercent(parseFloat(e.target.value) || 0)}
-              placeholder="9"
               className="w-20"
             />
           </div>
@@ -290,7 +258,6 @@ export default function SimpleInvoiceGenerator({
               type="number"
               value={sgstPercent}
               onChange={(e) => setSgstPercent(parseFloat(e.target.value) || 0)}
-              placeholder="9"
               className="w-20"
             />
           </div>
@@ -299,108 +266,89 @@ export default function SimpleInvoiceGenerator({
 
       <div className="text-sm text-muted-foreground">
         <Label>Footer text</Label>
-        <Textarea
-          value={footer}
-          onChange={(e) => setFooter(e.target.value)}
-          rows={2}
-          className="mt-1"
-        />
+        <Textarea value={footer} onChange={(e) => setFooter(e.target.value)} rows={2} className="mt-1" />
       </div>
 
       {/* Preview */}
-      <div
-        id="simple-invoice-print"
-        className="bg-muted/30 border rounded-lg p-6 text-sm"
-      >
+      <div id="simple-invoice-print" className="bg-muted/30 border rounded-lg p-6 text-sm">
         <div className="text-center mb-4 pb-3 border-b border-border">
           <h1 className="text-2xl font-bold">{businessName}</h1>
-          <p className="text-muted-foreground text-sm">{invoiceTitle}</p>
+          <p className="text-muted-foreground text-sm uppercase tracking-widest">{invoiceTitle}</p>
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
-            <p className="font-medium text-foreground/90">
-              GSTIN: {businessGst || "—"}
-            </p>
+            <p className="font-medium text-foreground/90">GSTIN: {businessGst || "—"}</p>
             <p>Location: {businessAddress || "—"}</p>
             <p>Ph: {businessPhone || "—"}</p>
           </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <p className="text-muted-foreground text-xs uppercase">
-              Bill To / Customer
-            </p>
+            <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Bill To</p>
             <p className="font-semibold">{customerName || "—"}</p>
-            <p className="text-muted-foreground">Ph: {phone || "—"}</p>
-            <p>Company: {companyName || "—"}</p>
-            <p className="text-muted-foreground">GST: {gstNumber || "—"}</p>
+            <p className="text-muted-foreground text-xs">{phone || "—"}</p>
           </div>
           <div className="text-right">
-            <p className="text-muted-foreground">Invoice #</p>
+            <p className="text-muted-foreground text-[10px] uppercase font-bold">Invoice #</p>
             <p className="font-semibold">{invoiceId}</p>
-            <p className="text-muted-foreground">
-              {new Date().toLocaleDateString("en-IN")}
-            </p>
+            <p className="text-muted-foreground text-xs">{new Date().toLocaleDateString("en-IN")}</p>
           </div>
         </div>
+
         <table className="w-full">
           <thead>
-            <tr className="border-b">
-              <th className="text-left py-2">Description</th>
-              <th className="text-right py-2">Amount (incl. taxes)</th>
+            <tr className="border-b bg-amber-50/50">
+              <th className="text-left py-2 px-2 font-bold">Description</th>
+              <th className="text-right py-2 px-2 font-bold">Amount (Excl. Tax)</th>
             </tr>
           </thead>
           <tbody>
-            {items
+            {processedItems
               .filter((i) => i.desc || i.amount)
               .map((item, idx) => (
                 <tr key={idx} className="border-b">
-                  <td className="py-2">{item.desc || "—"}</td>
-                  <td className="py-2 text-right">
-                    {s.currency}
-                    {parseFloat(item.amount || "0").toFixed(2)}
+                  <td className="py-2 px-2">{item.desc || "—"}</td>
+                  <td className="py-2 px-2 text-right">
+                    {s.currency}{item.preTax.toFixed(2)}
                   </td>
                 </tr>
               ))}
-            <tr className="border-b">
-              <td className="py-2">Subtotal</td>
-              <td className="py-2 text-right">
-                {s.currency}
-                {subtotal.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="border-b">
-              <td className="py-2 text-muted-foreground">
-                {cgstLabel} ({cgstPercent}%)
-              </td>
-              <td className="py-2 text-right text-muted-foreground">
-                {s.currency}
-                {cgstAmount.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="border-b">
-              <td className="py-2 text-muted-foreground">
-                {sgstLabel} ({sgstPercent}%)
-              </td>
-              <td className="py-2 text-right text-muted-foreground">
-                {s.currency}
-                {sgstAmount.toFixed(2)}
+            <tr className="bg-muted/10">
+              <td className="py-2 px-2 font-medium">Subtotal</td>
+              <td className="py-2 px-2 text-right">
+                {s.currency}{subtotal.toFixed(2)}
               </td>
             </tr>
             <tr>
-              <td className="py-2 font-bold">Total</td>
-              <td className="py-2 text-right font-bold">
-                {s.currency}
-                {total.toFixed(2)}
+              <td className="py-2 px-2 text-muted-foreground">
+                {cgstLabel} ({cgstPercent}%)
+              </td>
+              <td className="py-2 px-2 text-right text-muted-foreground">
+                {s.currency}{cgstAmount.toFixed(2)}
+              </td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2 px-2 text-muted-foreground">
+                {sgstLabel} ({sgstPercent}%)
+              </td>
+              <td className="py-2 px-2 text-right text-muted-foreground">
+                {s.currency}{sgstAmount.toFixed(2)}
+              </td>
+            </tr>
+            <tr className="bg-amber-50">
+              <td className="py-2 px-2 font-bold">Total (Incl. Tax)</td>
+              <td className="py-2 px-2 text-right font-bold">
+                {s.currency}{total.toFixed(2)}
               </td>
             </tr>
           </tbody>
         </table>
-        <p className="text-center text-muted-foreground text-xs mt-4">
+        <p className="text-center text-muted-foreground text-[10px] mt-6 italic">
           {footer}
         </p>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Enter room prices inclusive of taxes. Taxes are automatically back-calculated and shown separately. Click Print to generate the invoice.
+      <p className="text-[10px] text-muted-foreground bg-blue-50 p-2 rounded border border-blue-100 italic">
+        * Note: Enter your desired final prices in the "Line items" inputs. The invoice will automatically back-calculate and display the tax-exclusive base price and GST components for compliance.
       </p>
     </div>
   );

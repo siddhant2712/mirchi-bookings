@@ -78,25 +78,28 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setGstNumber(booking.guestGstNumber ?? "");
   }, [booking.id]);
 
-  // If the user entered a total amount for the room (inclusive of taxes),
-  // derive the room's pre-tax price so that: roomPreTax + taxesOnRoom = enteredRoomTotal.
-  // Extra items are treated as pre-tax amounts and taxed together with the room pre-tax.
+  const round = (n: number) => Math.round(n * 100) / 100;
+
   const enteredRoomTotal = parseFloat(totalAmount || "0");
   const extrasGross = extraItems.reduce(
     (sum, i) => sum + parseFloat(i.amount || "0"),
     0,
   );
-  const gross = enteredRoomTotal + extrasGross; // displayed subtotal / total
+
+  const gross = enteredRoomTotal + extrasGross;
   const totalTaxRate = (cgstPercent + sgstPercent) / 100;
-  const preTaxBase = totalTaxRate > 0 ? gross / (1 + totalTaxRate) : gross;
-  const preTaxRoom =
-    totalTaxRate > 0 ? enteredRoomTotal / (1 + totalTaxRate) : enteredRoomTotal;
-  const cgstAmount = preTaxBase * (cgstPercent / 100);
-  const sgstAmount = preTaxBase * (sgstPercent / 100);
+
+  const subtotal = totalTaxRate > 0 ? round(gross / (1 + totalTaxRate)) : gross;
+  const preTaxRoom = subtotal;
+
+  const cgstAmount = round(subtotal * (cgstPercent / 100));
+  const sgstAmount = round(subtotal * (sgstPercent / 100));
   const totalTax = cgstAmount + sgstAmount;
-  const subtotal = gross; // show gross as subtotal (tax-inclusive)
-  const total = gross; // total equals entered gross
-  const balance = total - parseFloat(advancePaid || "0");
+  const total = round(subtotal + totalTax);
+
+  // 🔹 Fix: Force balance to 0 if it's less than 1 Rupee (absolute value)
+  const rawBalance = total - parseFloat(advancePaid || "0");
+  const balance = Math.abs(rawBalance) < 1 ? 0 : round(rawBalance);
 
   const addExtraItem = () =>
     setExtraItems([...extraItems, { desc: "", amount: "" }]);
@@ -111,13 +114,35 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
   const handlePrint = () => {
     const lineRows = [
-      `<tr><td class="inv-desc">${escapeHtml(description)}<br><span class="inv-muted">${escapeHtml(dateRange)}</span></td><td class="inv-amt">${currency}${preTaxRoom.toFixed(2)}</td></tr>`,
+      (() => {
+        const roomPreTax = subtotal;
+        return `
+      <tr>
+        <td class="inv-desc">
+          ${escapeHtml(description)}<br>
+          <span class="inv-muted">${escapeHtml(dateRange)}</span>
+        </td>
+        <td class="inv-amt">
+          ${currency}${round(roomPreTax).toFixed(2)}
+        </td>
+      </tr>`;
+      })(),
+
       ...extraItems
         .filter((i) => i.desc || i.amount)
-        .map(
-          (i) =>
-            `<tr><td class="inv-desc">${escapeHtml(i.desc)}</td><td class="inv-amt">${currency}${parseFloat(i.amount || "0").toFixed(2)}</td></tr>`,
-        ),
+        .map((i) => {
+          const extraGross = parseFloat(i.amount || "0");
+          const extraPreTax =
+            totalTaxRate > 0 ? extraGross / (1 + totalTaxRate) : extraGross;
+
+          return `
+        <tr>
+          <td class="inv-desc">${escapeHtml(i.desc)}</td>
+          <td class="inv-amt">
+            ${currency}${round(extraPreTax).toFixed(2)}
+          </td>
+        </tr>`;
+        }),
     ].join("");
 
     const printBody = `
@@ -244,10 +269,12 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     extraItems
       .filter((i) => i.desc || i.amount)
       .forEach((it) => {
-        rows.push([
-          it.desc,
-          currency + parseFloat(it.amount || "0").toFixed(2),
-        ]);
+        const extraPreTax =
+          totalTaxRate > 0
+            ? round(parseFloat(it.amount || "0") / (1 + totalTaxRate))
+            : parseFloat(it.amount || "0");
+
+        rows.push([it.desc, currency + extraPreTax.toFixed(2)]);
       });
 
     let startY = 34;
@@ -275,22 +302,15 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     );
     doc.setFontSize(12);
     doc.text(`Total: ${currency}${total.toFixed(2)}`, 14, finalY + 30);
+    
+    // PDF Balance logic
+    doc.text(`Advance Paid: ${currency}${parseFloat(advancePaid).toFixed(2)}`, 14, finalY + 38);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Balance Due: ${currency}${balance.toFixed(2)}`, 14, finalY + 46);
 
     const filename = `invoice-${booking.id.slice(0, 8)}.pdf`;
     doc.save(filename);
   };
-
-  const ef = (v: string, set: (s: string) => void, placeholder: string) =>
-    editing ? (
-      <Input
-        value={v}
-        onChange={(e) => set(e.target.value)}
-        placeholder={placeholder}
-        className="h-8 text-sm"
-      />
-    ) : (
-      <span>{v || "—"}</span>
-    );
 
   return (
     <div className="space-y-4">
@@ -320,7 +340,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
       </div>
 
       <div className="bg-card border border-border rounded-lg p-6 space-y-5 text-sm">
-        {/* Header */}
         <div className="text-center border-b border-border pb-4">
           {editing ? (
             <div className="space-y-2">
@@ -372,7 +391,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
           )}
         </div>
 
-        {/* Meta */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
@@ -434,7 +452,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
           </div>
         </div>
 
-        {/* Table */}
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-amber-50 dark:bg-amber-950/30">
@@ -447,7 +464,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
             </tr>
           </thead>
           <tbody>
-            {/* Main room row */}
             <tr className="border-b border-border">
               <td className="py-2.5 px-3">
                 {editing ? (
@@ -489,7 +505,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* Extra items */}
             {extraItems.map((item, idx) => (
               <tr key={idx} className="border-b border-border">
                 <td className="py-2 px-3">
@@ -553,7 +568,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </tr>
             )}
 
-            {/* Subtotal */}
             <tr className="border-b border-border bg-muted/30">
               <td className="py-2 px-3 text-muted-foreground font-semibold">
                 Subtotal
@@ -564,7 +578,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* CGST */}
             <tr className="border-b border-border bg-muted/20">
               <td className="py-2 px-3 text-muted-foreground">
                 {editing ? (
@@ -596,7 +609,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* SGST */}
             <tr className="border-b border-border bg-muted/20">
               <td className="py-2 px-3 text-muted-foreground">
                 {editing ? (
@@ -628,7 +640,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* Total */}
             <tr className="bg-amber-50 dark:bg-amber-950/30 border-b-2 border-amber-200">
               <td className="py-3 px-3 font-bold text-amber-900 dark:text-amber-200 text-base">
                 Total
@@ -639,7 +650,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* Advance */}
             <tr className="border-b border-border bg-emerald-50/50 dark:bg-emerald-950/20">
               <td className="py-2 px-3 text-emerald-700 dark:text-emerald-400">
                 Advance Paid
@@ -658,7 +668,6 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               </td>
             </tr>
 
-            {/* Balance */}
             <tr>
               <td className="py-3 px-3 font-extrabold text-base">
                 Balance Due
@@ -667,7 +676,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
                 className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}
               >
                 {currency}
-                {balance.toFixed(2)}
+                {(balance === 0 ? 0 : balance).toFixed(2)}
               </td>
             </tr>
           </tbody>
