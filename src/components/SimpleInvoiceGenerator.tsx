@@ -40,15 +40,17 @@ export default function SimpleInvoiceGenerator({
     setItems(n);
   };
 
-  // --- CALCULATION LOGIC ---
+  // --- CALCULATION LOGIC (TAX EXCLUSIVE) ---
   const round = (n: number) => Math.round(n * 100) / 100;
-  const totalTaxRate = (cgstPercent + sgstPercent) / 100;
 
-  // Process items to get Pre-Tax values for display
+  // Process items: Input is now treated as Pre-Tax (Base) price
   const processedItems = items.map(item => {
-    const grossVal = parseFloat(item.amount || "0");
-    const preTaxVal = totalTaxRate > 0 ? round(grossVal / (1 + totalTaxRate)) : grossVal;
-    return { ...item, preTax: preTaxVal, gross: grossVal };
+    const baseVal = parseFloat(item.amount || "0");
+    const cgstForThisItem = round(baseVal * (cgstPercent / 100));
+    const sgstForThisItem = round(baseVal * (sgstPercent / 100));
+    const grossVal = baseVal + cgstForThisItem + sgstForThisItem;
+    
+    return { ...item, preTax: baseVal, gross: grossVal };
   });
 
   const subtotal = round(processedItems.reduce((sum, i) => sum + i.preTax, 0));
@@ -106,14 +108,14 @@ export default function SimpleInvoiceGenerator({
         </div>
         <table class="inv-table">
          <thead>
-           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (Excl. Tax)</th></tr>
+           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (Base Price)</th></tr>
          </thead>
          <tbody>
            ${itemRows}
            <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
            <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
            <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
-           <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
+           <tr class="inv-row-total"><td class="inv-desc">Total (Incl. Tax)</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
          </tbody>
         </table>
         <div class="inv-footer"><p>${escapeHtml(footer)}</p></div>
@@ -215,7 +217,7 @@ export default function SimpleInvoiceGenerator({
 
       <div>
         <div className="flex justify-between items-center mb-2">
-          <Label>Line items (Input total price including tax)</Label>
+          <Label>Line items (Input Base Price - Tax will be added)</Label>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
@@ -233,7 +235,7 @@ export default function SimpleInvoiceGenerator({
                 type="number"
                 value={item.amount}
                 onChange={(e) => updateItem(idx, "amount", e.target.value)}
-                placeholder="Total (Incl. Tax)"
+                placeholder="Base Price"
                 className="w-36"
               />
               <Button type="button" size="icon" variant="ghost" onClick={() => removeItem(idx)}>
@@ -298,7 +300,7 @@ export default function SimpleInvoiceGenerator({
           <thead>
             <tr className="border-b bg-amber-50/50">
               <th className="text-left py-2 px-2 font-bold">Description</th>
-              <th className="text-right py-2 px-2 font-bold">Amount (Excl. Tax)</th>
+              <th className="text-right py-2 px-2 font-bold">Base Price</th>
             </tr>
           </thead>
           <tbody>
@@ -335,7 +337,7 @@ export default function SimpleInvoiceGenerator({
               </td>
             </tr>
             <tr className="bg-amber-50">
-              <td className="py-2 px-2 font-bold">Total (Incl. Tax)</td>
+              <td className="py-2 px-2 font-bold">Grand Total</td>
               <td className="py-2 px-2 text-right font-bold">
                 {s.currency}{total.toFixed(2)}
               </td>
@@ -347,8 +349,8 @@ export default function SimpleInvoiceGenerator({
         </p>
       </div>
 
-      <p className="text-[10px] text-muted-foreground bg-blue-50 p-2 rounded border border-blue-100 italic">
-        * Note: Enter your desired final prices in the "Line items" inputs. The invoice will automatically back-calculate and display the tax-exclusive base price and GST components for compliance.
+      <p className="text-[10px] text-muted-foreground bg-green-50 p-2 rounded border border-green-100 italic">
+        * Note: Enter the Base Price (Tax Exclusive) in the "Line items". GST will be calculated and added to the Grand Total.
       </p>
     </div>
   );
