@@ -69,6 +69,10 @@ export default function SimpleInvoiceGenerator({
     return el.innerHTML;
   }
 
+  function sanitize(text: string): string {
+    return String(text || "").replace(/&/g, "").replace(/\s+/g, " ").trim();
+  }
+
   const gatherInvoiceData = (): StoredInvoice => {
     const now = new Date().toISOString();
     const subtotalVal = subtotal;
@@ -201,13 +205,96 @@ export default function SimpleInvoiceGenerator({
     const html = buildPrintHtmlSimple();
     const container = document.createElement("div");
     container.style.position = "fixed";
-    container.style.left = "-10000px";
-    container.style.top = "-10000px";
-    container.style.opacity = "0";
+    container.style.left = "50%";
+    container.style.top = "50%";
+    container.style.transform = "translate(-50%, -50%)";
+    container.style.zIndex = String(2147483647);
+    // Compute container width in pixels from jsPDF points (1pt = 1/72in, 96dpi => 1pt = 1.3333px)
+    const tmpDoc = new jsPDF({ unit: "pt", format: "a4" });
+    const pagePtWidth = tmpDoc.internal.pageSize.getWidth();
+    const pxPerPt = 96 / 72; // convert points to CSS pixels at 96dpi
+    container.style.width = `${Math.round(pagePtWidth * pxPerPt)}px`;
+    // free tmpDoc
+    try { tmpDoc.delete?.(); } catch {}
+    container.style.background = "#fff";
     container.innerHTML = html;
     document.body.appendChild(container);
-    const doc = new jsPDF({ unit: "pt" });
-    await doc.html(container, { callback: () => {}, x: 0, y: 0, html2canvas: { scale: 1 } });
+    // Prefer using html2canvas -> image -> addImage for exact control and paging.
+    // Try to dynamically import html2canvas (we added it to package.json). If not available, fallback to doc.html.
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pxToPt = 72 / 96;
+    const scale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+
+    try {
+      const html2canvasMod = await import("html2canvas");
+      const html2canvas = (html2canvasMod && (html2canvasMod.default || html2canvasMod)) as any;
+      // append container (visible) so html2canvas can render it
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      // render full element to canvas
+      const canvas: HTMLCanvasElement = await html2canvas(container, {
+        scale,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: container.clientWidth,
+      });
+
+      // slice canvas into page-sized chunks (in px) and add each as an image
+      const pagePxHeight = Math.floor(pageHeight * pxPerPt);
+      const totalPages = Math.ceil(canvas.height / pagePxHeight);
+
+      for (let i = 0; i < totalPages; i++) {
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        const sliceHeight = i === totalPages - 1 ? canvas.height - i * pagePxHeight : pagePxHeight;
+        sliceCanvas.height = sliceHeight;
+        const ctx = sliceCanvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context unavailable");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, i * pagePxHeight, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+
+        const imgData = sliceCanvas.toDataURL("image/png");
+        const imgWidthPt = pageWidth;
+        const imgHeightPt = sliceCanvas.height * pxToPt;
+
+        if (i > 0) doc.addPage();
+        doc.addImage(imgData, "PNG", 0, 0, imgWidthPt, imgHeightPt);
+      }
+
+      // cleanup
+      document.body.removeChild(container);
+      const blob = doc.output("blob");
+      return blob;
+    } catch (e) {
+      // fallback to jsPDF.html path if html2canvas import or rendering fails
+      try {
+        container.innerHTML = html;
+        document.body.appendChild(container);
+        const cssWidth = container.clientWidth || Math.round(pageWidth * (96 / 72));
+        await new Promise<void>((resolve, reject) => {
+          try {
+            doc.html(container, {
+              callback: () => resolve(),
+              x: 0,
+              y: 0,
+              html2canvas: { scale, width: cssWidth },
+              width: pageWidth,
+            });
+          } catch (err) {
+            reject(err);
+          }
+        });
+        const blob = doc.output("blob");
+        document.body.removeChild(container);
+        return blob;
+      } catch (err) {
+        try { document.body.removeChild(container); } catch {}
+        throw err;
+      }
+    }
     const blob = doc.output("blob");
     document.body.removeChild(container);
     return blob;
@@ -221,15 +308,51 @@ export default function SimpleInvoiceGenerator({
       const blob = await createSimplePDFBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
       a.download = `invoice-${invoiceId}.pdf`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // cleanup after a short delay to ensure the download has started
+      setTimeout(() => {
+        try {
+          document.body.removeChild(a);
+        } catch {}
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      }, 1000);
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate PDF");
+    }
+  };
+
+  const handlePrint = () => {
+    try {
+      saveInvoice(gatherInvoiceData());
+    } catch {}
+
+    try {
+      const html = buildPrintHtmlSimple();
+      const w = window.open("", "_blank", "width=800,height=600");
+      if (!w) {
+        toast.error("Unable to open print window");
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => {
+        try {
+          w.print();
+        } catch (e) {
+          console.error(e);
+        }
+      }, 250);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to open print preview");
     }
   };
 

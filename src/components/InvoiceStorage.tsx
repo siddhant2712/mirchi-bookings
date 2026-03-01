@@ -225,12 +225,15 @@ export default function InvoiceStorage() {
       const blob = await createInvoicePDFBlob(inv);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
       a.download = `invoice-${inv.id}.pdf`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch {}
+        try { URL.revokeObjectURL(url); } catch {}
+      }, 1000);
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate PDF");
@@ -243,24 +246,79 @@ export default function InvoiceStorage() {
   const createInvoicePDFBlob = async (inv: StoredInvoice): Promise<Blob> => {
     const htmlString = buildPrintHtml(inv);
     const container = document.createElement("div");
-    // keep element in document but not visible; html2canvas can't render display:none or visibility:hidden
     container.style.position = "fixed";
-    container.style.left = "-10000px";
-    container.style.top = "-10000px";
-    container.style.opacity = "0";
+    container.style.left = "50%";
+    container.style.top = "50%";
+    container.style.transform = "translate(-50%, -50%)";
+    container.style.zIndex = String(2147483647);
+    const tmpDoc = new jsPDF({ unit: "pt", format: "a4" });
+    const pagePtWidth = tmpDoc.internal.pageSize.getWidth();
+    const pxPerPt = 96 / 72;
+    container.style.width = `${Math.round(pagePtWidth * pxPerPt)}px`;
+    try { tmpDoc.delete?.(); } catch {}
     container.innerHTML = htmlString;
-    document.body.appendChild(container);
 
-    const doc = new jsPDF({ unit: "pt" });
-    await doc.html(container, {
-      callback: () => {},
-      x: 0,
-      y: 0,
-      html2canvas: { scale: 1 }
-    });
-    const blob = doc.output("blob");
-    document.body.removeChild(container);
-    return blob;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pxToPt = 72 / 96;
+    const scale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+
+    try {
+      const html2canvasMod = await import("html2canvas");
+      const html2canvas = (html2canvasMod && (html2canvasMod.default || html2canvasMod)) as any;
+      document.body.appendChild(container);
+      const canvas: HTMLCanvasElement = await html2canvas(container, {
+        scale,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: container.clientWidth,
+      });
+
+      const pagePxHeight = Math.floor(pageHeight * pxPerPt);
+      const totalPages = Math.ceil(canvas.height / pagePxHeight);
+
+      for (let i = 0; i < totalPages; i++) {
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        const sliceHeight = i === totalPages - 1 ? canvas.height - i * pagePxHeight : pagePxHeight;
+        sliceCanvas.height = sliceHeight;
+        const ctx = sliceCanvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas context unavailable");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, i * pagePxHeight, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+
+        const imgData = sliceCanvas.toDataURL("image/png");
+        const imgWidthPt = pageWidth;
+        const imgHeightPt = sliceCanvas.height * pxToPt;
+
+        if (i > 0) doc.addPage();
+        doc.addImage(imgData, "PNG", 0, 0, imgWidthPt, imgHeightPt);
+      }
+
+      document.body.removeChild(container);
+      const blob = doc.output("blob");
+      return blob;
+    } catch (e) {
+      // fallback to jsPDF.html
+      try {
+        document.body.appendChild(container);
+        await doc.html(container, {
+          callback: () => {},
+          x: 0,
+          y: 0,
+          html2canvas: { scale },
+          width: pageWidth,
+        });
+        const blob = doc.output("blob");
+        document.body.removeChild(container);
+        return blob;
+      } catch (err) {
+        try { document.body.removeChild(container); } catch {}
+        throw err;
+      }
+    }
   };
 
   // helper to generate the HTML used by printInvoice (includes styling so PDF rendering works)
@@ -369,12 +427,15 @@ export default function InvoiceStorage() {
       const content = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(content);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
       a.download = "invoices.zip";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        try { document.body.removeChild(a); } catch {}
+        try { URL.revokeObjectURL(url); } catch {}
+      }, 1000);
       toast.success("ZIP downloaded");
     } catch (e) {
       console.error(e);
