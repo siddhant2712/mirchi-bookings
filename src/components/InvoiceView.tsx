@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Printer, X, Pencil, Download } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { saveInvoice, StoredInvoice } from "@/lib/invoiceStore"; // new store
+
 
 interface InvoiceViewProps {
   booking: Booking;
@@ -82,6 +84,17 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
   const round = (n: number) => Math.round(n * 100) / 100;
 
+  function normalizeCurrency(curr: string): string {
+    let c = curr || "";
+    c = c.replace(/&/g, "");
+    return /^[\x00-\x7F]+$/.test(c) && c.trim() !== "" ? c : "Rs";
+  }
+
+  function sanitize(text: string): string {
+    // remove ampersands and extra spaces
+    return text.replace(/&/g, "").replace(/\s+/g, " ").trim();
+  }
+
   // Exclusive Tax Logic:
   // Subtotal is simply the sum of all entered amounts
   const roomSubtotal = parseFloat(roomBaseAmount || "0");
@@ -114,15 +127,61 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     return el.innerHTML;
   }
 
+  const gatherInvoiceData = (): StoredInvoice => {
+    // compute the same values as in rendering
+    const createdAt = new Date().toISOString();
+    return {
+      id: `${booking.id}-${createdAt}`,
+      bookingId: booking.id,
+      createdAt,
+      guestName,
+      phone,
+      description,
+      dateRange,
+      roomBaseAmount: parseFloat(roomBaseAmount || "0"),
+      extraItems: extraItems.map((i) => ({
+        desc: i.desc,
+        amount: parseFloat(i.amount || "0"),
+      })),
+      advancePaid: parseFloat(advancePaid || "0"),
+      extraNotes,
+      subtotal,
+      cgstLabel,
+      sgstLabel,
+      cgstPercent,
+      sgstPercent,
+      cgstAmount,
+      sgstAmount,
+      totalTax,
+      total,
+      balance,
+      currency,
+      hotelName,
+      hotelGstNumber,
+      hotelAddress,
+      hotelPhone,
+      invoiceTitle,
+      invoiceFooter,
+    };
+  };
+
   const handlePrint = () => {
+    // save before printing so state is captured
+    try {
+      saveInvoice(gatherInvoiceData());
+    } catch {
+      // ignore storage errors
+    }
+
+    const curr = normalizeCurrency(currency);
     const lineRows = [
       `<tr>
         <td class="inv-desc">
-          ${escapeHtml(description)}<br>
-          <span class="inv-muted">${escapeHtml(dateRange)}</span>
+          ${escapeHtml(sanitize(description))}<br>
+          <span class="inv-muted">${escapeHtml(sanitize(dateRange))}</span>
         </td>
         <td class="inv-amt">
-          ${currency}${roomSubtotal.toFixed(2)}
+          ${curr}${roomSubtotal.toFixed(2)}
         </td>
       </tr>`,
 
@@ -130,9 +189,9 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
         .filter((i) => i.desc || i.amount)
         .map((i) => `
         <tr>
-          <td class="inv-desc">${escapeHtml(i.desc)}</td>
+          <td class="inv-desc">${escapeHtml(sanitize(i.desc))}</td>
           <td class="inv-amt">
-            ${currency}${parseFloat(i.amount || "0").toFixed(2)}
+            ${curr}${parseFloat(i.amount || "0").toFixed(2)}
           </td>
         </tr>`),
     ].join("");
@@ -220,35 +279,142 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setTimeout(() => win.print(), 300);
   };
 
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text(hotelName, 14, 18);
-    doc.setFontSize(10);
-    doc.text(invoiceTitle, 14, 25);
+  // build HTML used for print/download in this view
+  const buildPrintHtmlForView = () => {
+    const curr = normalizeCurrency(currency);
+    const lineRows = [
+      `<tr>
+        <td class="inv-desc">
+          ${escapeHtml(sanitize(description))}<br>
+          <span class="inv-muted">${escapeHtml(sanitize(dateRange))}</span>
+        </td>
+        <td class="inv-amt">${curr}${roomSubtotal.toFixed(2)}</td>
+      </tr>`,
+      ...extraItems
+        .filter((i) => i.desc || i.amount)
+        .map(
+          (i) => `
+        <tr>
+          <td class="inv-desc">${escapeHtml(sanitize(i.desc))}</td>
+          <td class="inv-amt">${curr}${parseFloat(i.amount || "0").toFixed(2)}</td>
+        </tr>`,
+        ),
+    ].join("");
 
-    const rows: any[] = [];
-    rows.push([description, currency + roomSubtotal.toFixed(2)]);
-    extraItems
-      .filter((i) => i.desc || i.amount)
-      .forEach((it) => rows.push([it.desc, currency + parseFloat(it.amount || "0").toFixed(2)]));
+    return `
+      <style>
+          * { box-sizing: border-box; }
+          body { margin: 0; padding: 20px; font-family: sans-serif; font-size: 13px; color: #1f2937; background: #f9fafb; }
+          .inv-page { max-width: 210mm; margin: 0 auto; padding: 14mm; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+          .inv-letterhead { text-align: center; border-bottom: 3px solid #d97706; margin-bottom: 20px; padding-bottom: 10px; }
+          .inv-brand { font-size: 1.6rem; color: #92400e; margin: 0; }
+          .inv-meta { display: flex; justify-content: space-between; margin-bottom: 20px; }
+          .inv-label { font-size: 0.7rem; color: #9ca3af; text-transform: uppercase; font-weight: bold; }
+          .inv-table { width: 100%; border-collapse: collapse; }
+          .inv-th-left, .inv-th-right { background: #fef3c7; padding: 10px; text-align: left; border-bottom: 2px solid #fcd34d; }
+          .inv-th-right { text-align: right; }
+          .inv-desc, .inv-amt { padding: 10px; border-bottom: 1px solid #f3f4f6; }
+          .inv-amt { text-align: right; }
+          .inv-row-total { background: #fef3c7; font-weight: bold; }
+          .inv-row-balance { font-size: 1.1rem; font-weight: 800; border-top: 2px solid #eee; }
+          .inv-balance-due { color: #dc2626; }
+          .inv-footer { margin-top: 30px; text-align: center; color: #9ca3af; font-size: 0.8rem; }
+      </style>
+      <div class="inv-page">
+        <div class="inv-letterhead">
+          <div class="inv-letterhead-inner">
+            <h1 class="inv-brand">${escapeHtml(sanitize(hotelName))}</h1>
+            <p class="inv-doctitle">${escapeHtml(sanitize(invoiceTitle))}</p>
+            <div class="inv-business-details">
+              <p class="inv-gst">GSTIN: ${escapeHtml(sanitize(hotelGstNumber || "—"))}</p>
+              <p class="inv-address">📍 ${escapeHtml(sanitize(hotelAddress || "—"))}</p>
+              <p class="inv-phone">📞 ${escapeHtml(sanitize(hotelPhone || "—"))}</p>
+            </div>
+          </div>
+        </div>
 
-    autoTable(doc, {
-      startY: 35,
-      head: [["Description", "Amount"]],
-      body: rows,
-      headStyles: { fillColor: [217, 119, 6] },
+        <div class="inv-meta">
+          <div class="inv-billto">
+            <p class="inv-label">Bill To / Customer</p>
+            <p class="inv-guest">${escapeHtml(sanitize(guestName))}</p>
+            <p class="inv-muted">📞 ${escapeHtml(sanitize(phone || "—"))}</p>
+            ${companyName ? `<p class="inv-company">${escapeHtml(sanitize(companyName))}</p>` : ""}
+            ${gstNumber ? `<p class="inv-muted">GST: ${escapeHtml(sanitize(gstNumber))}</p>` : ""}
+          </div>
+          <div class="inv-invoice-meta">
+            <table class="inv-meta-table">
+              <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${booking.id.slice(0, 8).toUpperCase()}</td></tr>
+              <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
+              <tr><td class="inv-label">Status</td><td class="inv-value">${booking.status.replace("-", " ").toUpperCase()}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <table class="inv-table">
+          <thead>
+            <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount</th></tr>
+          </thead>
+          <tbody>
+            ${lineRows}
+            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${curr}${subtotal.toFixed(2)}</td></tr>
+            <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(cgstLabel)} (${cgstPercent}%)</td><td class="inv-amt">${curr}${cgstAmount.toFixed(2)}</td></tr>
+            <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(sgstLabel)} (${sgstPercent}%)</td><td class="inv-amt">${curr}${sgstAmount.toFixed(2)}</td></tr>
+            <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${curr}${total.toFixed(2)}</td></tr>
+            <tr class="inv-row-advance"><td class="inv-desc">Advance Paid</td><td class="inv-amt inv-paid">− ${curr}${parseFloat(advancePaid).toFixed(2)}</td></tr>
+            <tr class="inv-row-balance"><td class="inv-desc">Balance Due</td><td class="inv-amt ${balance > 0 ? "inv-balance-due" : "inv-balance-ok"}">${curr}${balance.toFixed(2)}</td></tr>
+          </tbody>
+        </table>
+
+        ${extraNotes ? `<div class="inv-notes"><p class="inv-label">Notes</p><p class="inv-muted">${escapeHtml(extraNotes)}</p></div>` : ""}
+
+        <div class="inv-footer">
+          <p>${escapeHtml(invoiceFooter)}</p>
+        </div>
+      </div>`;
+  };
+
+  const createViewPDFBlob = async (): Promise<Blob> => {
+    const html = buildPrintHtmlForView();
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.left = "-10000px";
+    container.style.top = "-10000px";
+    container.style.opacity = "0";
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    const doc = new jsPDF({ unit: "pt" });
+    await doc.html(container, {
+      callback: () => {},
+      x: 0,
+      y: 0,
+      html2canvas: { scale: 1 },
     });
+    const blob = doc.output("blob");
+    document.body.removeChild(container);
+    return blob;
+  };
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.text(`Subtotal: ${currency}${subtotal.toFixed(2)}`, 14, finalY);
-    doc.text(`${cgstLabel}: ${currency}${cgstAmount.toFixed(2)}`, 14, finalY + 6);
-    doc.text(`${sgstLabel}: ${currency}${sgstAmount.toFixed(2)}`, 14, finalY + 12);
-    doc.setFontSize(12);
-    doc.text(`Total: ${currency}${total.toFixed(2)}`, 14, finalY + 22);
-    doc.text(`Balance Due: ${currency}${balance.toFixed(2)}`, 14, finalY + 30);
+  const handleDownloadPDF = async () => {
+    // store invoice before generating PDF
+    try {
+      saveInvoice(gatherInvoiceData());
+    } catch {}
 
-    doc.save(`invoice-${booking.id.slice(0, 8)}.pdf`);
+    try {
+      const blob = await createViewPDFBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${booking.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to generate PDF");
+    }
   };
 
   return (
@@ -318,11 +484,11 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
             <tr className="bg-muted/30">
               <td className="py-2 px-3 font-semibold">Subtotal</td>
-              <td className="py-2 px-3 text-right">{currency}{subtotal.toFixed(2)}</td>
+              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{subtotal.toFixed(2)}</td>
             </tr>
             <tr>
               <td className="py-2 px-3">{cgstLabel} ({cgstPercent}%)</td>
-              <td className="py-2 px-3 text-right">{currency}{cgstAmount.toFixed(2)}</td>
+              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{cgstAmount.toFixed(2)}</td>
             </tr>
             <tr>
               <td className="py-2 px-3">{sgstLabel} ({sgstPercent}%)</td>
@@ -330,16 +496,16 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
             </tr>
             <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
               <td className="py-3 px-3">Total (Incl. Tax)</td>
-              <td className="py-3 px-3 text-right">{currency}{total.toFixed(2)}</td>
+              <td className="py-3 px-3 text-right">{normalizeCurrency(currency)}{total.toFixed(2)}</td>
             </tr>
             <tr>
               <td className="py-2 px-3">Advance Paid</td>
-              <td className="py-2 px-3 text-right">{currency}{parseFloat(advancePaid).toFixed(2)}</td>
+              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{parseFloat(advancePaid).toFixed(2)}</td>
             </tr>
             <tr>
               <td className="py-3 px-3 font-extrabold text-base">Balance Due</td>
               <td className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}>
-                {currency}{balance.toFixed(2)}
+                {normalizeCurrency(currency)}{balance.toFixed(2)}
               </td>
             </tr>
           </tbody>

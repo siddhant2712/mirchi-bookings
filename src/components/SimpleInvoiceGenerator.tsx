@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { getSettings } from "@/lib/settingsStore";
+import { saveInvoice, StoredInvoice } from "@/lib/invoiceStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Printer, X, Plus } from "lucide-react";
+import { Printer, X, Plus, Download } from "lucide-react";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
 
 interface SimpleInvoiceGeneratorProps {
   onClose: () => void;
@@ -66,69 +69,59 @@ export default function SimpleInvoiceGenerator({
     return el.innerHTML;
   }
 
-  const handlePrint = () => {
+  const gatherInvoiceData = (): StoredInvoice => {
+    const now = new Date().toISOString();
+    const subtotalVal = subtotal;
+    const cgstAmt = cgstAmount;
+    const sgstAmt = sgstAmount;
+    const totalVal = total;
+    const balanceVal = totalVal; // no advance concept here
+    return {
+      id: `simple-${now}`,
+      bookingId: `simple-${now}`,
+      createdAt: now,
+      guestName: customerName || "",
+      phone,
+      description: "",
+      dateRange: new Date().toLocaleDateString("en-IN"),
+      roomBaseAmount: subtotalVal,
+      extraItems: processedItems.map((i) => ({ desc: i.desc, amount: i.preTax })),
+      advancePaid: 0,
+      extraNotes: "",
+      subtotal: subtotalVal,
+      cgstLabel,
+      sgstLabel,
+      cgstPercent,
+      sgstPercent,
+      cgstAmount: cgstAmt,
+      sgstAmount: sgstAmt,
+      totalTax: cgstAmt + sgstAmt,
+      total: totalVal,
+      balance: balanceVal,
+      currency: s.currency || "",
+      hotelName: businessName,
+      hotelGstNumber: businessGst,
+      hotelAddress: businessAddress,
+      hotelPhone: businessPhone,
+      invoiceTitle,
+      invoiceFooter: footer,
+    };
+  };
+
+  // reuse both in print and pdf download
+  const buildPrintHtmlSimple = () => {
     const itemRows = processedItems
       .filter((i) => i.desc || i.amount)
       .map(
         (i) =>
           `<tr>
-            <td class="inv-desc">${escapeHtml(i.desc || "—")}</td>
+            <td class="inv-desc">${escapeHtml(sanitize(i.desc || "—"))}</td>
             <td class="inv-amt">${s.currency}${i.preTax.toFixed(2)}</td>
           </tr>`,
       )
       .join("");
-    
-    const printBody = `
-      <div class="inv-page">
-        <div class="inv-letterhead">
-         <div class="inv-letterhead-inner">
-           <h1 class="inv-brand">${escapeHtml(businessName)}</h1>
-           <p class="inv-doctitle">${escapeHtml(invoiceTitle)}</p>
-           <div class="inv-business-details">
-             <p class="inv-gst">GSTIN: ${escapeHtml(businessGst || "—")}</p>
-             <p class="inv-address">Location: ${escapeHtml(businessAddress || "—")}</p>
-             <p class="inv-phone">Ph: ${escapeHtml(businessPhone || "—")}</p>
-           </div>
-         </div>
-        </div>
-        <div class="inv-meta">
-         <div class="inv-billto">
-           <p class="inv-label">Bill To / Customer</p>
-           <p class="inv-guest">${escapeHtml(customerName || "—")}</p>
-           <p class="inv-muted">Ph: ${escapeHtml(phone || "—")}</p>
-           <p class="inv-company">Company: ${escapeHtml(companyName || "—")}</p>
-           <p class="inv-muted">GST: ${escapeHtml(gstNumber || "—")}</p>
-         </div>
-         <div class="inv-invoice-meta">
-           <table class="inv-meta-table">
-             <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${invoiceId}</td></tr>
-             <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
-           </table>
-         </div>
-        </div>
-        <table class="inv-table">
-         <thead>
-           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (Base Price)</th></tr>
-         </thead>
-         <tbody>
-           ${itemRows}
-           <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
-           <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
-           <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
-           <tr class="inv-row-total"><td class="inv-desc">Total (Incl. Tax)</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
-         </tbody>
-        </table>
-        <div class="inv-footer"><p>${escapeHtml(footer)}</p></div>
-      </div>`;
-    
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`
-      <!DOCTYPE html>
-      <html><head>
-        <meta charset="utf-8">
-        <title>Invoice - ${escapeHtml(customerName || "Invoice")}</title>
-        <style>
+    return `
+      <style>
           * { box-sizing: border-box; }
           body { margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; color: #1f2937; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           @media print { body { padding: 0; } .inv-page { box-shadow: none !important; border: 1px solid #e5e7eb !important; } }
@@ -160,12 +153,84 @@ export default function SimpleInvoiceGenerator({
           .inv-row-total { background: #fef3c7; }
           .inv-row-total .inv-desc, .inv-row-total .inv-amt { font-weight: 600; border-bottom-color: #fcd34d; padding: 10px 12px; }
           .inv-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 0.8rem; color: #9ca3af; }
-        </style>
-      </head><body>${printBody}</body></html>
-    `);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 300);
+      </style>
+      <div class="inv-page">
+        <div class="inv-letterhead">
+         <div class="inv-letterhead-inner">
+           <h1 class="inv-brand">${escapeHtml(sanitize(businessName))}</h1>
+           <p class="inv-doctitle">${escapeHtml(sanitize(invoiceTitle))}</p>
+           <div class="inv-business-details">
+             <p class="inv-gst">GSTIN: ${escapeHtml(sanitize(businessGst || "—"))}</p>
+             <p class="inv-address">Location: ${escapeHtml(sanitize(businessAddress || "—"))}</p>
+             <p class="inv-phone">Ph: ${escapeHtml(sanitize(businessPhone || "—"))}</p>
+           </div>
+         </div>
+        </div>
+        <div class="inv-meta">
+         <div class="inv-billto">
+           <p class="inv-label">Bill To / Customer</p>
+           <p class="inv-guest">${escapeHtml(sanitize(customerName || "—"))}</p>
+           <p class="inv-muted">Ph: ${escapeHtml(sanitize(phone || "—"))}</p>
+           <p class="inv-company">Company: ${escapeHtml(sanitize(companyName || "—"))}</p>
+           <p class="inv-muted">GST: ${escapeHtml(sanitize(gstNumber || "—"))}</p>
+         </div>
+         <div class="inv-invoice-meta">
+           <table class="inv-meta-table">
+             <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${invoiceId}</td></tr>
+             <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
+           </table>
+         </div>
+        </div>
+        <table class="inv-table">
+         <thead>
+           <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount (Base Price)</th></tr>
+         </thead>
+         <tbody>
+           ${itemRows}
+           <tr class="inv-row-sub"><td class="inv-desc">Subtotal</td><td class="inv-amt">${s.currency}${subtotal.toFixed(2)}</td></tr>
+           <tr class="inv-row-sub"><td class="inv-desc">${cgstLabel} (${cgstPercent}%)</td><td class="inv-amt">${s.currency}${cgstAmount.toFixed(2)}</td></tr>
+           <tr class="inv-row-sub"><td class="inv-desc">${sgstLabel} (${sgstPercent}%)</td><td class="inv-amt">${s.currency}${sgstAmount.toFixed(2)}</td></tr>
+           <tr class="inv-row-total"><td class="inv-desc">Total (Incl. Tax)</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
+         </tbody>
+        </table>
+        <div class="inv-footer"><p>${escapeHtml(sanitize(footer))}</p></div>
+      </div>`;
+  };
+
+  const createSimplePDFBlob = async (): Promise<Blob> => {
+    const html = buildPrintHtmlSimple();
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.left = "-10000px";
+    container.style.top = "-10000px";
+    container.style.opacity = "0";
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    const doc = new jsPDF({ unit: "pt" });
+    await doc.html(container, { callback: () => {}, x: 0, y: 0, html2canvas: { scale: 1 } });
+    const blob = doc.output("blob");
+    document.body.removeChild(container);
+    return blob;
+  };
+
+  const handleDownload = async () => {
+    try {
+      saveInvoice(gatherInvoiceData());
+    } catch {}
+    try {
+      const blob = await createSimplePDFBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to generate PDF");
+    }
   };
 
   return (
@@ -175,6 +240,9 @@ export default function SimpleInvoiceGenerator({
         <div className="flex gap-2">
           <Button size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-1" /> Print
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleDownload}>
+            <Download className="h-4 w-4 mr-1" /> Download
           </Button>
           <Button size="sm" variant="outline" onClick={onClose}>
             <X className="h-4 w-4" />

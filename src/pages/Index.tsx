@@ -37,6 +37,7 @@ import RevenueView from "@/components/RevenueView";
 import SettingsMenu from "@/components/SettingsMenu";
 import SimpleInvoiceGenerator from "@/components/SimpleInvoiceGenerator";
 import CalendarView from "@/components/CalendarView";
+import InvoiceStorage from "@/components/InvoiceStorage";
 import { Booking } from "@/lib/types";
 import {
   exportBookingsJSON,
@@ -393,7 +394,7 @@ const Index = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-xl grid-cols-5 h-12 rounded-xl bg-muted/50 p-1.5 shadow-inner">
+          <TabsList className="grid w-full max-w-xl grid-cols-6 h-12 rounded-xl bg-muted/50 p-1.5 shadow-inner">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
             </TabsTrigger>
@@ -405,6 +406,9 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="revenue" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" /> Revenue
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Invoices
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="h-4 w-4" /> Settings
@@ -531,6 +535,10 @@ const Index = () => {
               {/* lazy-load component */}
               <RevenueView />
             </div>
+          </TabsContent>
+
+          <TabsContent value="invoices" className="mt-0">
+            <InvoiceStorage />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-0">
