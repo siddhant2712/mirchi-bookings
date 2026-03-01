@@ -34,6 +34,8 @@ export default function SimpleInvoiceGenerator({
   const [cgstPercent, setCgstPercent] = useState(s.cgstPercent);
   const [sgstPercent, setSgstPercent] = useState(s.sgstPercent);
   const [footer, setFooter] = useState(s.invoiceFooter);
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
 
   const addItem = () => setItems([...items, { desc: "", amount: "" }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
@@ -180,9 +182,46 @@ export default function SimpleInvoiceGenerator({
          </div>
          <div class="inv-invoice-meta">
            <table class="inv-meta-table">
-             <tr><td class="inv-label">Invoice No.</td><td class="inv-value">${invoiceId}</td></tr>
-             <tr><td class="inv-label">Date</td><td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td></tr>
-           </table>
+  <tr>
+    <td class="inv-label">Invoice No.</td>
+    <td class="inv-value">${invoiceId}</td>
+  </tr>
+
+  <tr>
+    <td class="inv-label">Check-In</td>
+    <td class="inv-value">
+      ${checkIn
+        ? new Date(checkIn).toLocaleDateString("en-IN") +
+          " " +
+          new Date(checkIn).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "—"}
+    </td>
+  </tr>
+
+  <tr>
+    <td class="inv-label">Check-Out</td>
+    <td class="inv-value">
+      ${checkOut
+        ? new Date(checkOut).toLocaleDateString("en-IN") +
+          " " +
+          new Date(checkOut).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "—"}
+    </td>
+  </tr>
+
+  <tr>
+    <td class="inv-label">Date</td>
+    <td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td>
+  </tr>
+</table>
          </div>
         </div>
         <table class="inv-table">
@@ -403,6 +442,24 @@ export default function SimpleInvoiceGenerator({
           <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="GST number" />
         </div>
       </div>
+      <div className="grid grid-cols-2 gap-3 mt-3">
+  <div>
+    <Label>Check-In</Label>
+    <Input
+      type="datetime-local"
+      value={checkIn}
+      onChange={(e) => setCheckIn(e.target.value)}
+    />
+  </div>
+  <div>
+    <Label>Check-Out</Label>
+    <Input
+      type="datetime-local"
+      value={checkOut}
+      onChange={(e) => setCheckOut(e.target.value)}
+    />
+  </div>
+</div>
 
       <div>
         <div className="flex justify-between items-center mb-2">
@@ -479,10 +536,38 @@ export default function SimpleInvoiceGenerator({
             <p className="text-muted-foreground text-xs">{phone || "—"}</p>
           </div>
           <div className="text-right">
-            <p className="text-muted-foreground text-[10px] uppercase font-bold">Invoice #</p>
-            <p className="font-semibold">{invoiceId}</p>
-            <p className="text-muted-foreground text-xs">{new Date().toLocaleDateString("en-IN")}</p>
-          </div>
+  <p className="text-muted-foreground text-[10px] uppercase font-bold">Invoice #</p>
+  <p className="font-semibold">{invoiceId}</p>
+  <p className="text-muted-foreground text-xs">
+    {new Date().toLocaleDateString("en-IN")}
+  </p>
+
+  <p className="text-xs mt-1">
+    <span className="font-medium">Check-In:</span>{" "}
+    {checkIn
+      ? new Date(checkIn).toLocaleDateString("en-IN") +
+        " " +
+        new Date(checkIn).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "—"}
+  </p>
+
+  <p className="text-xs">
+    <span className="font-medium">Check-Out:</span>{" "}
+    {checkOut
+      ? new Date(checkOut).toLocaleDateString("en-IN") +
+        " " +
+        new Date(checkOut).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "—"}
+  </p>
+</div>
         </div>
 
         <table className="w-full">
