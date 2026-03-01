@@ -301,9 +301,7 @@ export default function SimpleInvoiceGenerator({
   };
 
   const handleDownload = async () => {
-    try {
-      saveInvoice(gatherInvoiceData());
-    } catch {}
+    // do not persist the invoice when downloading; storage happens only on print
     try {
       const blob = await createSimplePDFBlob();
       const url = URL.createObjectURL(blob);

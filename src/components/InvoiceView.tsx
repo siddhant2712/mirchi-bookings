@@ -452,11 +452,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   };
 
   const handleDownloadPDF = async () => {
-    // store invoice before generating PDF
-    try {
-      saveInvoice(gatherInvoiceData());
-    } catch {}
-
+    // do not save when downloading; invoices persist only on print
     try {
       const blob = await createViewPDFBlob();
       const url = URL.createObjectURL(blob);
