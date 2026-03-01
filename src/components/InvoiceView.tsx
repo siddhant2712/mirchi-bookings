@@ -65,6 +65,10 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     { desc: string; amount: string }[]
   >([]);
 
+  // allow manual overrides when editing
+  const [overrideSubtotal, setOverrideSubtotal] = useState("");
+  const [overrideTotal, setOverrideTotal] = useState("");
+
   useEffect(() => {
     const s = getSettings();
     setHotelName(s.businessName);
@@ -80,6 +84,12 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     setSgstPercent(s.sgstPercent);
     setCompanyName(booking.guestCompanyName ?? "");
     setGstNumber(booking.guestGstNumber ?? "");
+
+    // reset editable fields when booking changes
+    setRoomBaseAmount(booking.amount.toString());
+    setAdvancePaid(booking.advance.toString());
+    setOverrideSubtotal("");
+    setOverrideTotal("");
   }, [booking.id]);
 
   const round = (n: number) => Math.round(n * 100) / 100;
@@ -105,13 +115,21 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
 
   const subtotal = round(roomSubtotal + extrasSubtotal);
 
-  // Calculate taxes ON TOP of subtotal
-  const cgstAmount = round(subtotal * (cgstPercent / 100));
-  const sgstAmount = round(subtotal * (sgstPercent / 100));
+  // if the user has overridden subtotal while editing, use that value
+  const effectiveSubtotal =
+    editing && overrideSubtotal !== ""
+      ? parseFloat(overrideSubtotal)
+      : subtotal;
+
+  // Calculate taxes ON TOP of effective subtotal
+  const cgstAmount = round(effectiveSubtotal * (cgstPercent / 100));
+  const sgstAmount = round(effectiveSubtotal * (sgstPercent / 100));
   const totalTax = cgstAmount + sgstAmount;
   
-  // Total = Subtotal + Tax
-  const total = round(subtotal + totalTax);
+  // Total = Subtotal + Tax (may also be overridden)
+  const computedTotal = round(effectiveSubtotal + totalTax);
+  const total =
+    editing && overrideTotal !== "" ? parseFloat(overrideTotal) : computedTotal;
 
   const rawBalance = total - parseFloat(advancePaid || "0");
   const balance = Math.abs(rawBalance) < 1 ? 0 : round(rawBalance);
@@ -128,8 +146,18 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   }
 
   const gatherInvoiceData = (): StoredInvoice => {
-    // compute the same values as in rendering
+    // compute the same values as in rendering (respecting overrides)
     const createdAt = new Date().toISOString();
+    const effSubtotal =
+      editing && overrideSubtotal !== "" ? parseFloat(overrideSubtotal) : subtotal;
+    const effCgst = round(effSubtotal * (cgstPercent / 100));
+    const effSgst = round(effSubtotal * (sgstPercent / 100));
+    const effTotalTax = effCgst + effSgst;
+    const effComputedTotal = round(effSubtotal + effTotalTax);
+    const effTotal =
+      editing && overrideTotal !== "" ? parseFloat(overrideTotal) : effComputedTotal;
+    const effBalance = effTotal - parseFloat(advancePaid || "0");
+
     return {
       id: `${booking.id}-${createdAt}`,
       bookingId: booking.id,
@@ -145,16 +173,16 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
       })),
       advancePaid: parseFloat(advancePaid || "0"),
       extraNotes,
-      subtotal,
+      subtotal: effSubtotal,
       cgstLabel,
       sgstLabel,
       cgstPercent,
       sgstPercent,
-      cgstAmount,
-      sgstAmount,
-      totalTax,
-      total,
-      balance,
+      cgstAmount: effCgst,
+      sgstAmount: effSgst,
+      totalTax: effTotalTax,
+      total: effTotal,
+      balance: Math.abs(effBalance) < 1 ? 0 : round(effBalance),
       currency,
       hotelName,
       hotelGstNumber,
@@ -233,7 +261,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
           </thead>
           <tbody>
             ${lineRows}
-            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${currency}${subtotal.toFixed(2)}</td></tr>
+            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${currency}${effectiveSubtotal.toFixed(2)}</td></tr>
             <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(cgstLabel)} (${cgstPercent}%)</td><td class="inv-amt">${currency}${cgstAmount.toFixed(2)}</td></tr>
             <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(sgstLabel)} (${sgstPercent}%)</td><td class="inv-amt">${currency}${sgstAmount.toFixed(2)}</td></tr>
             <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${currency}${total.toFixed(2)}</td></tr>
@@ -356,7 +384,7 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
           </thead>
           <tbody>
             ${lineRows}
-            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${curr}${subtotal.toFixed(2)}</td></tr>
+            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${curr}${effectiveSubtotal.toFixed(2)}</td></tr>
             <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(cgstLabel)} (${cgstPercent}%)</td><td class="inv-amt">${curr}${cgstAmount.toFixed(2)}</td></tr>
             <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(sgstLabel)} (${sgstPercent}%)</td><td class="inv-amt">${curr}${sgstAmount.toFixed(2)}</td></tr>
             <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${curr}${total.toFixed(2)}</td></tr>
@@ -534,32 +562,67 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
               <tr><td colSpan={2} className="py-2 px-3"><Button variant="outline" size="sm" onClick={addExtraItem}>+ Add Line Item</Button></td></tr>
             )}
 
-            <tr className="bg-muted/30">
-              <td className="py-2 px-3 font-semibold">Subtotal</td>
-              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{subtotal.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">{cgstLabel} ({cgstPercent}%)</td>
-              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{cgstAmount.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">{sgstLabel} ({sgstPercent}%)</td>
-              <td className="py-2 px-3 text-right">{currency}{sgstAmount.toFixed(2)}</td>
-            </tr>
-            <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
-              <td className="py-3 px-3">Total (Incl. Tax)</td>
-              <td className="py-3 px-3 text-right">{normalizeCurrency(currency)}{total.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">Advance Paid</td>
-              <td className="py-2 px-3 text-right">{normalizeCurrency(currency)}{parseFloat(advancePaid).toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td className="py-3 px-3 font-extrabold text-base">Balance Due</td>
-              <td className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}>
-                {normalizeCurrency(currency)}{balance.toFixed(2)}
-              </td>
-            </tr>
+                    <tr className="bg-muted/30">
+                <td className="py-2 px-3 font-semibold">Subtotal</td>
+                <td className="py-2 px-3 text-right">
+                  {editing ? (
+                    <Input
+                      type="number"
+                      className="w-28 ml-auto text-right"
+                      value={overrideSubtotal || subtotal.toFixed(2)}
+                      onChange={(e) => setOverrideSubtotal(e.target.value)}
+                    />
+                  ) : (
+                    `${normalizeCurrency(currency)}${effectiveSubtotal.toFixed(2)}`
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2 px-3">{cgstLabel} ({cgstPercent}%)</td>
+                <td className="py-2 px-3 text-right">
+                  {normalizeCurrency(currency)}{cgstAmount.toFixed(2)}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2 px-3">{sgstLabel} ({sgstPercent}%)</td>
+                <td className="py-2 px-3 text-right">{currency}{sgstAmount.toFixed(2)}</td>
+              </tr>
+              <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
+                <td className="py-3 px-3">Total (Incl. Tax)</td>
+                <td className="py-3 px-3 text-right">
+                  {editing ? (
+                    <Input
+                      type="number"
+                      className="w-28 ml-auto text-right"
+                      value={overrideTotal || computedTotal.toFixed(2)}
+                      onChange={(e) => setOverrideTotal(e.target.value)}
+                    />
+                  ) : (
+                    `${normalizeCurrency(currency)}${total.toFixed(2)}`
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2 px-3">Advance Paid</td>
+                <td className="py-2 px-3 text-right">
+                  {editing ? (
+                    <Input
+                      type="number"
+                      className="w-28 ml-auto text-right"
+                      value={advancePaid}
+                      onChange={(e) => setAdvancePaid(e.target.value)}
+                    />
+                  ) : (
+                    `${normalizeCurrency(currency)}${parseFloat(advancePaid).toFixed(2)}`
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-3 px-3 font-extrabold text-base">Balance Due</td>
+                <td className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}>
+                  {normalizeCurrency(currency)}{balance.toFixed(2)}
+                </td>
+              </tr>
           </tbody>
         </table>
         <div className="text-center text-xs text-muted-foreground border-t pt-3">{invoiceFooter}</div>
