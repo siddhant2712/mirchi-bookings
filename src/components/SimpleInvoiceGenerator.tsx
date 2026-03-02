@@ -34,8 +34,16 @@ export default function SimpleInvoiceGenerator({
   const [cgstPercent, setCgstPercent] = useState(s.cgstPercent);
   const [sgstPercent, setSgstPercent] = useState(s.sgstPercent);
   const [footer, setFooter] = useState(s.invoiceFooter);
+  
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState(
+  "INV-" + Date.now().toString(36).toUpperCase()
+);
+const gstRegex =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+const [gstError, setGstError] = useState("");
 
   const addItem = () => setItems([...items, { desc: "", amount: "" }]);
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
@@ -63,7 +71,7 @@ export default function SimpleInvoiceGenerator({
   const sgstAmount = round(subtotal * (sgstPercent / 100));
   const total = round(subtotal + cgstAmount + sgstAmount);
   
-  const invoiceId = "INV-" + Date.now().toString(36).toUpperCase();
+  const invoiceId = invoiceNumber;
 
   function escapeHtml(text: string): string {
     const el = document.createElement("div");
@@ -148,7 +156,28 @@ export default function SimpleInvoiceGenerator({
           .inv-muted { margin: 0; color: #6b7280; font-size: 0.85rem; }
           .inv-invoice-meta { text-align: right; }
           .inv-meta-table { margin-left: auto; border-collapse: collapse; }
-          .inv-meta-table td { padding: 2px 0 2px 12px; vertical-align: top; }
+          .inv-meta-table {
+  border-collapse: collapse;
+  margin-left: auto;
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 4px 16px 4px 0;
+  white-space: nowrap;
+  text-align: left;
+  min-width: 95px;
+}
+
+.meta-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+  padding: 4px 0;
+  text-align: right;
+}
           .inv-value { font-weight: 600; color: #1f2937; }
           .inv-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
           .inv-th-left, .inv-th-right { text-align: left; padding: 10px 12px; background: #f8fafc; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; border-bottom: 1px solid #e2e8f0; }
@@ -183,13 +212,13 @@ export default function SimpleInvoiceGenerator({
          <div class="inv-invoice-meta">
            <table class="inv-meta-table">
   <tr>
-    <td class="inv-label">Invoice No.</td>
-    <td class="inv-value">${invoiceId}</td>
+    <td class="meta-label">Invoice No.</td>
+    <td class="meta-value">${invoiceId}</td>
   </tr>
 
   <tr>
-    <td class="inv-label">Check-In</td>
-    <td class="inv-value">
+    <td class="meta-label">Check-In</td>
+    <td class="meta-value">
       ${checkIn
         ? new Date(checkIn).toLocaleDateString("en-IN") +
           " " +
@@ -203,8 +232,8 @@ export default function SimpleInvoiceGenerator({
   </tr>
 
   <tr>
-    <td class="inv-label">Check-Out</td>
-    <td class="inv-value">
+    <td class="meta-label">Check-Out</td>
+    <td class="meta-value">
       ${checkOut
         ? new Date(checkOut).toLocaleDateString("en-IN") +
           " " +
@@ -218,8 +247,10 @@ export default function SimpleInvoiceGenerator({
   </tr>
 
   <tr>
-    <td class="inv-label">Date</td>
-    <td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td>
+    <td class="meta-label">Date</td>
+    <td class="meta-value">
+      ${new Date().toLocaleDateString("en-IN")}
+    </td>
   </tr>
 </table>
          </div>
@@ -236,7 +267,19 @@ export default function SimpleInvoiceGenerator({
            <tr class="inv-row-total"><td class="inv-desc">Total (Incl. Tax)</td><td class="inv-amt">${s.currency}${total.toFixed(2)}</td></tr>
          </tbody>
         </table>
-        <div class="inv-footer"><p>${escapeHtml(sanitize(footer))}</p></div>
+        <div style="margin-top:40px; display:flex; justify-content:space-between;">
+  <div style="text-align:center;">
+    <div style="border-top:1px solid #000; width:150px; margin:0 auto 6px;"></div>
+    <span style="font-size:12px;">Guest Signature</span>
+  </div>
+
+  <div style="text-align:center;">
+    <div style="border-top:1px solid #000; width:150px; margin:0 auto 6px;"></div>
+    <span style="font-size:12px;">Receptionist Signature</span>
+  </div>
+</div>
+
+<div class="inv-footer">
       </div>`;
   };
 
@@ -364,8 +407,13 @@ export default function SimpleInvoiceGenerator({
       toast.error("Failed to generate PDF");
     }
   };
-
+ 
   const handlePrint = () => {
+    if (gstNumber) {
+  if (gstNumber.length !== 15 || !gstRegex.test(gstNumber)) {
+    alert("Invalid GST Number.\n\nFormat should be like:\n22AAAAA0000A1Z5");
+  }
+}
     try {
       saveInvoice(gatherInvoiceData());
     } catch {}
@@ -439,7 +487,11 @@ export default function SimpleInvoiceGenerator({
           <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
           <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company name" />
-          <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="GST number" />
+          <Input
+  value={gstNumber}
+  onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+  placeholder="22AAAAA0000A1Z5"
+/>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 mt-3">
@@ -541,6 +593,13 @@ export default function SimpleInvoiceGenerator({
   <p className="text-muted-foreground text-xs">
     {new Date().toLocaleDateString("en-IN")}
   </p>
+  <div>
+  <Label>Invoice Number</Label>
+  <Input
+    value={invoiceNumber}
+    onChange={(e) => setInvoiceNumber(e.target.value)}
+  />
+</div>
 
   <p className="text-xs mt-1">
     <span className="font-medium">Check-In:</span>{" "}
@@ -618,6 +677,17 @@ export default function SimpleInvoiceGenerator({
             </tr>
           </tbody>
         </table>
+        <div className="flex justify-between mt-12 pt-8">
+  <div className="text-center">
+    <div className="border-t w-40 mx-auto mb-2"></div>
+    <p className="text-xs">Guest Signature</p>
+  </div>
+
+  <div className="text-center">
+    <div className="border-t w-40 mx-auto mb-2"></div>
+    <p className="text-xs">Receptionist Signature</p>
+  </div>
+</div>
         <p className="text-center text-muted-foreground text-[10px] mt-6 italic">
           {footer}
         </p>
