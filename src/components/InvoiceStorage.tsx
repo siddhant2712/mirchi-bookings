@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import jszip from "jszip";
+import { time } from "console";
 
 export default function InvoiceStorage() {
   const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
