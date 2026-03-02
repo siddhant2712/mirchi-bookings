@@ -59,6 +59,16 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   const [roomBaseAmount, setRoomBaseAmount] = useState(
     booking.amount.toString(),
   );
+  const [invoiceNumber, setInvoiceNumber] = useState(
+    booking.id.slice(0, 5).toUpperCase(),
+  );
+
+  const [checkInDate, setCheckInDate] = useState(booking.checkIn);
+  const [checkOutDate, setCheckOutDate] = useState(booking.checkOut);
+
+  const [invoiceDate, setInvoiceDate] = useState(
+    new Date().toISOString().slice(0, 16),
+  );
   const [advancePaid, setAdvancePaid] = useState(booking.advance.toString());
   const [extraNotes, setExtraNotes] = useState(booking.notes ?? "");
   const [extraItems, setExtraItems] = useState<
@@ -115,6 +125,19 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     el.textContent = text;
     return el.innerHTML;
   }
+  function formatDateTime(dateStr: string) {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
 
   const handlePrint = () => {
     const lineRows = [
@@ -163,39 +186,25 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
             ${gstNumber ? `<p class="inv-muted">GST: ${escapeHtml(gstNumber)}</p>` : ""}
           </div>
           <div class="inv-invoice-meta">
-            <table class="inv-meta-table">
+           <table class="inv-meta-table">
   <tr>
-    <td class="inv-label">Invoice No.</td>
-    <td class="inv-value">${booking.id.slice(0, 5).toUpperCase()}</td>
+    <td class="meta-label">Invoice No.</td>
+    <td class="meta-value">${escapeHtml(invoiceNumber)}</td>
   </tr>
 
   <tr>
-    <td class="inv-label">Check-In</td>
-    <td class="inv-value">
-      ${new Date(booking.checkIn).toLocaleDateString("en-IN")} 
-      ${new Date(booking.checkIn).toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })}
-    </td>
+    <td class="meta-label">Check-In</td>
+    <td class="meta-value">${formatDateTime(checkInDate)}</td>
   </tr>
 
   <tr>
-    <td class="inv-label">Check-Out</td>
-    <td class="inv-value">
-      ${new Date(booking.checkOut).toLocaleDateString("en-IN")} 
-      ${new Date(booking.checkOut).toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })}
-    </td>
+    <td class="meta-label">Check-Out</td>
+    <td class="meta-value">${formatDateTime(checkOutDate)}</td>
   </tr>
 
   <tr>
-    <td class="inv-label">Date</td>
-    <td class="inv-value">${new Date().toLocaleDateString("en-IN")}</td>
+    <td class="meta-label">Invoice Date</td>
+    <td class="meta-value">${formatDateTime(invoiceDate)}</td>
   </tr>
 </table>
           </div>
@@ -238,6 +247,25 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
           .inv-label { font-size: 0.7rem; color: #9ca3af; text-transform: uppercase; font-weight: bold; }
           .inv-table { width: 100%; border-collapse: collapse; }
           .inv-th-left, .inv-th-right { background: #fef3c7; padding: 10px; text-align: left; border-bottom: 2px solid #fcd34d; }
+          .inv-meta-table {
+  border-collapse: collapse;
+  margin-left: auto;
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 6px 20px 6px 0;
+  min-width: 110px;
+  text-align: left;
+}
+
+.meta-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: right;
+}
           .inv-th-right { text-align: right; }
           .inv-desc, .inv-amt { padding: 10px; border-bottom: 1px solid #f3f4f6; }
           .inv-amt { text-align: right; }
@@ -298,190 +326,279 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-bold">Invoice Preview (Tax Exclusive)</h3>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant={editing ? "default" : "outline"}
-            onClick={() => setEditing(!editing)}
-          >
-            <Pencil className="h-4 w-4 mr-1" />
-            {editing ? "Done Editing" : "Edit"}
-          </Button>
-          <Button size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-1" />
-            Print
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleDownloadPDF}>
-            <Download className="h-4 w-4 mr-1" />
-            Download
-          </Button>
-          <Button size="sm" variant="outline" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+  <div className="space-y-4">
+    <div className="flex justify-between items-center">
+      <h3 className="text-lg font-bold">
+        Invoice Preview (Tax Exclusive)
+      </h3>
+
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={editing ? "default" : "outline"}
+          onClick={() => setEditing(!editing)}
+        >
+          <Pencil className="h-4 w-4 mr-1" />
+          {editing ? "Done Editing" : "Edit"}
+        </Button>
+
+        <Button size="sm" onClick={handlePrint}>
+          <Printer className="h-4 w-4 mr-1" />
+          Print
+        </Button>
+
+        <Button size="sm" variant="outline" onClick={handleDownloadPDF}>
+          <Download className="h-4 w-4 mr-1" />
+          Download
+        </Button>
+
+        <Button size="sm" variant="outline" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+
+    <div className="bg-card border border-border rounded-lg p-6 space-y-6 text-sm">
+
+      {/* HOTEL HEADER */}
+      <div className="text-center border-b border-border pb-4">
+        {editing ? (
+          <Input
+            className="text-center font-bold text-xl"
+            value={hotelName}
+            onChange={(e) => setHotelName(e.target.value)}
+          />
+        ) : (
+          <h1 className="text-2xl font-extrabold text-primary">
+            {hotelName}
+          </h1>
+        )}
+        <p className="text-muted-foreground text-xs uppercase mt-1">
+          {invoiceTitle}
+        </p>
       </div>
 
-      <div className="bg-card border border-border rounded-lg p-6 space-y-5 text-sm">
-        <div className="text-center border-b border-border pb-4">
-          {editing ? (
-            <Input
-              className="text-center font-bold text-xl"
-              value={hotelName}
-              onChange={(e) => setHotelName(e.target.value)}
-            />
-          ) : (
-            <h1 className="text-2xl font-extrabold text-primary">
-              {hotelName}
-            </h1>
-          )}
-          <p className="text-muted-foreground text-xs uppercase mt-1">
-            {invoiceTitle}
-          </p>
-        </div>
+      {/* INVOICE META SECTION (PRINT STYLE) */}
+      <table className="w-full text-sm border-b pb-4">
+        <tbody>
+          <tr>
+            <td className="py-1 font-medium text-muted-foreground w-40">
+              Invoice No.
+            </td>
+            <td className="py-1 text-right">
+              {editing ? (
+                <Input
+                  className="w-40 ml-auto text-right"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                />
+              ) : (
+                <span className="font-semibold">{invoiceNumber}</span>
+              )}
+            </td>
+          </tr>
 
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="bg-amber-50">
-              <th className="text-left py-2 px-3 border-b-2 border-amber-200">
-                Description
-              </th>
-              <th className="text-right py-2 px-3 border-b-2 border-amber-200">
-                Amount (Excl. Tax)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-border">
-              <td className="py-2.5 px-3">
+          <tr>
+            <td className="py-1 font-medium text-muted-foreground">
+              Check-In
+            </td>
+            <td className="py-1 text-right">
+              {editing ? (
+                <Input
+                  type="datetime-local"
+                  className="w-56 ml-auto text-right"
+                  value={checkInDate}
+                  onChange={(e) => setCheckInDate(e.target.value)}
+                />
+              ) : (
+                formatDateTime(checkInDate)
+              )}
+            </td>
+          </tr>
+
+          <tr>
+            <td className="py-1 font-medium text-muted-foreground">
+              Check-Out
+            </td>
+            <td className="py-1 text-right">
+              {editing ? (
+                <Input
+                  type="datetime-local"
+                  className="w-56 ml-auto text-right"
+                  value={checkOutDate}
+                  onChange={(e) => setCheckOutDate(e.target.value)}
+                />
+              ) : (
+                formatDateTime(checkOutDate)
+              )}
+            </td>
+          </tr>
+
+          <tr>
+            <td className="py-1 font-medium text-muted-foreground">
+              Invoice Date
+            </td>
+            <td className="py-1 text-right">
+              {editing ? (
+                <Input
+                  type="datetime-local"
+                  className="w-56 ml-auto text-right"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                />
+              ) : (
+                formatDateTime(invoiceDate)
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* DESCRIPTION TABLE */}
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-amber-50">
+            <th className="text-left py-2 px-3 border-b-2 border-amber-200">
+              Description
+            </th>
+            <th className="text-right py-2 px-3 border-b-2 border-amber-200">
+              Amount (Excl. Tax)
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr className="border-b border-border">
+            <td className="py-2.5 px-3">
+              {editing ? (
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              ) : (
+                description
+              )}
+            </td>
+
+            <td className="py-2.5 px-3 text-right">
+              {editing ? (
+                <Input
+                  type="number"
+                  className="w-28 ml-auto text-right"
+                  value={roomBaseAmount}
+                  onChange={(e) => setRoomBaseAmount(e.target.value)}
+                />
+              ) : (
+                <span className="font-medium">
+                  {currency}{roomSubtotal.toFixed(2)}
+                </span>
+              )}
+            </td>
+          </tr>
+
+          {extraItems.map((item, idx) => (
+            <tr key={idx} className="border-b border-border">
+              <td className="py-2 px-3">
                 {editing ? (
                   <Input
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    value={item.desc}
+                    onChange={(e) => {
+                      const n = [...extraItems];
+                      n[idx].desc = e.target.value;
+                      setExtraItems(n);
+                    }}
                   />
                 ) : (
-                  <span>{description}</span>
+                  item.desc
                 )}
               </td>
-              <td className="py-2.5 px-3 text-right">
+
+              <td className="py-2 px-3 text-right">
                 {editing ? (
                   <Input
                     type="number"
-                    className="w-28 ml-auto text-right"
-                    value={roomBaseAmount}
-                    onChange={(e) => setRoomBaseAmount(e.target.value)}
+                    value={item.amount}
+                    onChange={(e) => {
+                      const n = [...extraItems];
+                      n[idx].amount = e.target.value;
+                      setExtraItems(n);
+                    }}
                   />
                 ) : (
-                  <span className="font-medium">
-                    {currency}
-                    {roomSubtotal.toFixed(2)}
-                  </span>
+                  `${currency}${parseFloat(item.amount || "0").toFixed(2)}`
                 )}
               </td>
             </tr>
+          ))}
 
-            {extraItems.map((item, idx) => (
-              <tr key={idx} className="border-b border-border">
-                <td className="py-2 px-3">
-                  {editing ? (
-                    <Input
-                      value={item.desc}
-                      onChange={(e) => {
-                        const n = [...extraItems];
-                        n[idx].desc = e.target.value;
-                        setExtraItems(n);
-                      }}
-                    />
-                  ) : (
-                    item.desc
-                  )}
-                </td>
-                <td className="py-2 px-3 text-right">
-                  {editing ? (
-                    <Input
-                      type="number"
-                      value={item.amount}
-                      onChange={(e) => {
-                        const n = [...extraItems];
-                        n[idx].amount = e.target.value;
-                        setExtraItems(n);
-                      }}
-                    />
-                  ) : (
-                    `${currency}${parseFloat(item.amount || "0").toFixed(2)}`
-                  )}
-                </td>
-              </tr>
-            ))}
+          {editing && (
+            <tr>
+              <td colSpan={2} className="py-2 px-3">
+                <Button variant="outline" size="sm" onClick={addExtraItem}>
+                  + Add Line Item
+                </Button>
+              </td>
+            </tr>
+          )}
 
-            {editing && (
-              <tr>
-                <td colSpan={2} className="py-2 px-3">
-                  <Button variant="outline" size="sm" onClick={addExtraItem}>
-                    + Add Line Item
-                  </Button>
-                </td>
-              </tr>
-            )}
+          <tr className="bg-muted/30">
+            <td className="py-2 px-3 font-semibold">Subtotal</td>
+            <td className="py-2 px-3 text-right">
+              {currency}{subtotal.toFixed(2)}
+            </td>
+          </tr>
 
-            <tr className="bg-muted/30">
-              <td className="py-2 px-3 font-semibold">Subtotal</td>
-              <td className="py-2 px-3 text-right">
-                {currency}
-                {subtotal.toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">
-                {cgstLabel} ({cgstPercent}%)
-              </td>
-              <td className="py-2 px-3 text-right">
-                {currency}
-                {cgstAmount.toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">
-                {sgstLabel} ({sgstPercent}%)
-              </td>
-              <td className="py-2 px-3 text-right">
-                {currency}
-                {sgstAmount.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
-              <td className="py-3 px-3">Total (Incl. Tax)</td>
-              <td className="py-3 px-3 text-right">
-                {currency}
-                {total.toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td className="py-2 px-3">Advance Paid</td>
-              <td className="py-2 px-3 text-right">
-                {currency}
-                {parseFloat(advancePaid).toFixed(2)}
-              </td>
-            </tr>
-            <tr>
-              <td className="py-3 px-3 font-extrabold text-base">
-                Balance Due
-              </td>
-              <td
-                className={`py-3 px-3 text-right font-extrabold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600"}`}
-              >
-                {currency}
-                {balance.toFixed(2)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="text-center text-xs text-muted-foreground border-t pt-3">
-          {invoiceFooter}
-        </div>
+          <tr>
+            <td className="py-2 px-3">
+              {cgstLabel} ({cgstPercent}%)
+            </td>
+            <td className="py-2 px-3 text-right">
+              {currency}{cgstAmount.toFixed(2)}
+            </td>
+          </tr>
+
+          <tr>
+            <td className="py-2 px-3">
+              {sgstLabel} ({sgstPercent}%)
+            </td>
+            <td className="py-2 px-3 text-right">
+              {currency}{sgstAmount.toFixed(2)}
+            </td>
+          </tr>
+
+          <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
+            <td className="py-3 px-3">Total (Incl. Tax)</td>
+            <td className="py-3 px-3 text-right">
+              {currency}{total.toFixed(2)}
+            </td>
+          </tr>
+
+          <tr>
+            <td className="py-2 px-3">Advance Paid</td>
+            <td className="py-2 px-3 text-right">
+              {currency}{parseFloat(advancePaid).toFixed(2)}
+            </td>
+          </tr>
+
+          <tr>
+            <td className="py-3 px-3 font-extrabold text-base">
+              Balance Due
+            </td>
+            <td
+              className={`py-3 px-3 text-right font-extrabold text-base ${
+                balance > 0 ? "text-destructive" : "text-emerald-600"
+              }`}
+            >
+              {currency}{balance.toFixed(2)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* FOOTER */}
+      <div className="text-center text-xs text-muted-foreground border-t pt-3">
+        {invoiceFooter}
       </div>
     </div>
-  );
-}
+  </div>
+)};
