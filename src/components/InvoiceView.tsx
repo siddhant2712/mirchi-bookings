@@ -59,9 +59,21 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   const [roomBaseAmount, setRoomBaseAmount] = useState(
     booking.amount.toString(),
   );
-  const [invoiceNumber, setInvoiceNumber] = useState(
-    booking.id.slice(0, 5).toUpperCase(),
-  );
+ const generateInvoiceNumber = () => {
+  const now = new Date();
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const day = pad(now.getDate());
+  const month = pad(now.getMonth() + 1);
+  const year = now.getFullYear().toString().slice(-2);
+  const hours = pad(now.getHours());
+  const minutes = pad(now.getMinutes());
+
+  return `Inv-${day}${month}${year}-${hours}${minutes}`;
+};
+
+const [invoiceNumber, setInvoiceNumber] = useState(generateInvoiceNumber());
 
   const [checkInDate, setCheckInDate] = useState(booking.checkIn);
   const [checkOutDate, setCheckOutDate] = useState(booking.checkOut);
@@ -139,147 +151,304 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
     });
   }
 
-  const handlePrint = () => {
-    const lineRows = [
-      `<tr>
-        <td class="inv-desc">
-          ${escapeHtml(description)}<br>
-        </td>
+ const handlePrint = () => {
+  const lineRows = [
+    `<tr>
+      <td class="inv-desc">
+        ${escapeHtml(description)}<br>
+      </td>
+      <td class="inv-amt">
+        ${currency}${roomSubtotal.toFixed(2)}
+      </td>
+    </tr>`,
+
+    ...extraItems
+      .filter((i) => i.desc || i.amount)
+      .map(
+        (i) => `
+      <tr>
+        <td class="inv-desc">${escapeHtml(i.desc)}</td>
         <td class="inv-amt">
-          ${currency}${roomSubtotal.toFixed(2)}
+          ${currency}${parseFloat(i.amount || "0").toFixed(2)}
         </td>
       </tr>`,
+      ),
+  ].join("");
 
-      ...extraItems
-        .filter((i) => i.desc || i.amount)
-        .map(
-          (i) => `
-        <tr>
-          <td class="inv-desc">${escapeHtml(i.desc)}</td>
-          <td class="inv-amt">
-            ${currency}${parseFloat(i.amount || "0").toFixed(2)}
-          </td>
-        </tr>`,
-        ),
-    ].join("");
-
-    const printBody = `
-      <div class="inv-page">
-        <div class="inv-letterhead">
-          <div class="inv-letterhead-inner">
-            <h1 class="inv-brand">${escapeHtml(hotelName)}</h1>
-            <p class="inv-doctitle">${escapeHtml(invoiceTitle)}</p>
-            <div class="inv-business-details">
-              <p class="inv-gst">GSTIN: ${escapeHtml(hotelGstNumber || "—")}</p>
-              <p class="inv-address">📍 ${escapeHtml(hotelAddress || "—")}</p>
-              <p class="inv-phone">📞 ${escapeHtml(hotelPhone || "—")}</p>
-            </div>
+  const printBody = `
+    <div class="inv-page">
+      <div class="inv-letterhead">
+        <div class="inv-letterhead-inner">
+          <h1 class="inv-brand">${escapeHtml(hotelName)}</h1>
+          <p class="inv-doctitle">${escapeHtml(invoiceTitle)}</p>
+          <div class="inv-business-details">
+            <p class="inv-gst">GSTIN: ${escapeHtml(hotelGstNumber || "—")}</p>
+            <p class="inv-address">📍 ${escapeHtml(hotelAddress || "—")}</p>
+            <p class="inv-phone">📞 ${escapeHtml(hotelPhone || "—")}</p>
           </div>
         </div>
+      </div>
 
-        <div class="inv-meta">
-          <div class="inv-billto">
-            <p class="inv-label">Bill To / Customer</p>
-            <p class="inv-guest">${escapeHtml(guestName)}</p>
-            <p class="inv-muted">📞 ${escapeHtml(phone || "—")}</p>
-            ${companyName ? `<p class="inv-company">${escapeHtml(companyName)}</p>` : ""}
-            ${gstNumber ? `<p class="inv-muted">GST: ${escapeHtml(gstNumber)}</p>` : ""}
-          </div>
-          <div class="inv-invoice-meta">
-           <table class="inv-meta-table">
-  <tr>
-    <td class="meta-label">Invoice No.</td>
-    <td class="meta-value">${escapeHtml(invoiceNumber)}</td>
-  </tr>
+      <div class="inv-meta">
+        <div class="inv-billto">
+          <p class="inv-label">Bill To / Customer</p>
+          <p class="inv-guest">${escapeHtml(guestName)}</p>
+          <p class="inv-muted">📞 ${escapeHtml(phone || "—")}</p>
+          ${companyName ? `<p class="inv-company">${escapeHtml(companyName)}</p>` : ""}
+          ${gstNumber ? `<p class="inv-muted">GST: ${escapeHtml(gstNumber)}</p>` : ""}
+        </div>
+        <div class="inv-invoice-meta">
+          <table class="inv-meta-table">
+            <tr>
+              <td class="meta-label">Invoice No.</td>
+              <td class="meta-value">${escapeHtml(invoiceNumber)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Check-In</td>
+              <td class="meta-value">${formatDateTime(checkInDate)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Check-Out</td>
+              <td class="meta-value">${formatDateTime(checkOutDate)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Invoice Date</td>
+              <td class="meta-value">${formatDateTime(invoiceDate)}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
 
-  <tr>
-    <td class="meta-label">Check-In</td>
-    <td class="meta-value">${formatDateTime(checkInDate)}</td>
-  </tr>
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th class="inv-th-left">Description</th>
+            <th class="inv-th-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lineRows}
 
-  <tr>
-    <td class="meta-label">Check-Out</td>
-    <td class="meta-value">${formatDateTime(checkOutDate)}</td>
-  </tr>
+          <tr class="inv-row-sub">
+            <td class="inv-desc inv-subtotal-label">Subtotal</td>
+            <td class="inv-amt">${currency}${subtotal.toFixed(2)}</td>
+          </tr>
 
-  <tr>
-    <td class="meta-label">Invoice Date</td>
-    <td class="meta-value">${formatDateTime(invoiceDate)}</td>
-  </tr>
-</table>
-          </div>
+          <tr class="inv-row-tax">
+            <td class="inv-desc">${escapeHtml(cgstLabel)} (${cgstPercent}%)</td>
+            <td class="inv-amt">${currency}${cgstAmount.toFixed(2)}</td>
+          </tr>
+
+          <tr class="inv-row-tax">
+            <td class="inv-desc">${escapeHtml(sgstLabel)} (${sgstPercent}%)</td>
+            <td class="inv-amt">${currency}${sgstAmount.toFixed(2)}</td>
+          </tr>
+
+          <tr class="inv-row-total">
+            <td class="inv-desc">Total</td>
+            <td class="inv-amt">${currency}${total.toFixed(2)}</td>
+          </tr>
+
+          <!-- Hidden Only In Print -->
+          <tr class="inv-row-advance hide-print">
+            <td class="inv-desc">Advance Paid</td>
+            <td class="inv-amt inv-paid">
+              − ${currency}${parseFloat(advancePaid).toFixed(2)}
+            </td>
+          </tr>
+
+          <tr class="inv-row-balance hide-print">
+            <td class="inv-desc">Balance Due</td>
+            <td class="inv-amt ${balance > 0 ? "inv-balance-due" : "inv-balance-ok"}">
+              ${currency}${balance.toFixed(2)}
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+
+      ${
+        extraNotes
+          ? `
+        <div class="inv-notes">
+          <p class="inv-label">Notes</p>
+          <p class="inv-muted">${escapeHtml(extraNotes)}</p>
+        </div>`
+          : ""
+      }
+
+      <div class="inv-footer">
+        <p>${escapeHtml(invoiceFooter)}</p>
+      </div>
+
+      <!-- SIGNATURE SECTION -->
+      <div class="inv-signatures">
+        <div class="inv-sign-box">
+          <div class="inv-sign-line"></div>
+          <p>Customer Signature</p>
         </div>
 
-        <table class="inv-table">
-          <thead>
-            <tr><th class="inv-th-left">Description</th><th class="inv-th-right">Amount</th></tr>
-          </thead>
-          <tbody>
-            ${lineRows}
-            <tr class="inv-row-sub"><td class="inv-desc inv-subtotal-label">Subtotal</td><td class="inv-amt">${currency}${subtotal.toFixed(2)}</td></tr>
-            <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(cgstLabel)} (${cgstPercent}%)</td><td class="inv-amt">${currency}${cgstAmount.toFixed(2)}</td></tr>
-            <tr class="inv-row-tax"><td class="inv-desc">${escapeHtml(sgstLabel)} (${sgstPercent}%)</td><td class="inv-amt">${currency}${sgstAmount.toFixed(2)}</td></tr>
-            <tr class="inv-row-total"><td class="inv-desc">Total</td><td class="inv-amt">${currency}${total.toFixed(2)}</td></tr>
-            <tr class="inv-row-advance"><td class="inv-desc">Advance Paid</td><td class="inv-amt inv-paid">− ${currency}${parseFloat(advancePaid).toFixed(2)}</td></tr>
-            <tr class="inv-row-balance"><td class="inv-desc">Balance Due</td><td class="inv-amt ${balance > 0 ? "inv-balance-due" : "inv-balance-ok"}">${currency}${balance.toFixed(2)}</td></tr>
-          </tbody>
-        </table>
-
-        ${extraNotes ? `<div class="inv-notes"><p class="inv-label">Notes</p><p class="inv-muted">${escapeHtml(extraNotes)}</p></div>` : ""}
-
-        <div class="inv-footer">
-          <p>${escapeHtml(invoiceFooter)}</p>
+        <div class="inv-sign-box">
+          <div class="inv-sign-line"></div>
+          <p>Authorized Signature</p>
         </div>
-      </div>`;
+      </div>
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`
-      <html><head>
-        <title>Invoice - ${escapeHtml(guestName)}</title>
-        <style>
-          * { box-sizing: border-box; }
-          body { margin: 0; padding: 20px; font-family: sans-serif; font-size: 13px; color: #1f2937; background: #f9fafb; }
-          .inv-page { max-width: 210mm; margin: 0 auto; padding: 14mm; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-          .inv-letterhead { text-align: center; border-bottom: 3px solid #d97706; margin-bottom: 20px; padding-bottom: 10px; }
-          .inv-brand { font-size: 1.6rem; color: #92400e; margin: 0; }
-          .inv-meta { display: flex; justify-content: space-between; margin-bottom: 20px; }
-          .inv-label { font-size: 0.7rem; color: #9ca3af; text-transform: uppercase; font-weight: bold; }
-          .inv-table { width: 100%; border-collapse: collapse; }
-          .inv-th-left, .inv-th-right { background: #fef3c7; padding: 10px; text-align: left; border-bottom: 2px solid #fcd34d; }
-          .inv-meta-table {
-  border-collapse: collapse;
-  margin-left: auto;
-}
+    </div>`;
 
-.meta-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #6b7280;
-  padding: 6px 20px 6px 0;
-  min-width: 110px;
-  text-align: left;
-}
+  const win = window.open("", "_blank");
+  if (!win) return;
 
-.meta-value {
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: right;
-}
-          .inv-th-right { text-align: right; }
-          .inv-desc, .inv-amt { padding: 10px; border-bottom: 1px solid #f3f4f6; }
-          .inv-amt { text-align: right; }
-          .inv-row-total { background: #fef3c7; font-weight: bold; }
-          .inv-row-balance { font-size: 1.1rem; font-weight: 800; border-top: 2px solid #eee; }
-          .inv-balance-due { color: #dc2626; }
-          .inv-footer { margin-top: 30px; text-align: center; color: #9ca3af; font-size: 0.8rem; }
-        </style>
-      </head><body>${printBody}</body></html>
-    `);
-    win.document.close();
+  win.document.write(`
+  <html>
+    <head>
+      <title>Invoice - ${escapeHtml(guestName)}</title>
+      <style>
+
+        * { box-sizing: border-box; }
+
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: sans-serif;
+          font-size: 13px;
+          color: #1f2937;
+          background: #fff;
+        }
+
+        .inv-page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 15mm;
+          margin: 0 auto;
+          background: #fff;
+        }
+
+        .inv-letterhead {
+          text-align: center;
+          border-bottom: 3px solid #d97706;
+          margin-bottom: 20px;
+          padding-bottom: 10px;
+        }
+
+        .inv-brand {
+          font-size: 2rem;
+          color: #92400e;
+          margin: 0;
+        }
+
+        .inv-meta {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+
+        .inv-label {
+          font-size: 0.7rem;
+          color: #9ca3af;
+          text-transform: uppercase;
+          font-weight: bold;
+        }
+
+        .inv-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .inv-th-left,
+        .inv-th-right {
+          background: #fef3c7;
+          padding: 10px;
+          text-align: left;
+          border-bottom: 2px solid #fcd34d;
+        }
+
+        .inv-th-right { text-align: right; }
+
+        .inv-desc,
+        .inv-amt {
+          padding: 10px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .inv-amt { text-align: right; }
+
+        .inv-row-total {
+          background: #fef3c7;
+          font-weight: bold;
+        }
+
+        .inv-row-balance {
+          font-size: 1.1rem;
+          font-weight: 800;
+          border-top: 2px solid #eee;
+        }
+
+        .inv-balance-due { color: #dc2626; }
+
+        .inv-footer {
+          margin-top: 30px;
+          text-align: center;
+          color: #9ca3af;
+          font-size: 0.8rem;
+        }
+
+        /* SIGNATURE SECTION */
+        .inv-signatures {
+          margin-top: 50px;
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .inv-sign-box {
+          width: 38%;
+          padding: 12px 15px;
+          text-align: center;
+          border: 1px solid #e5e7eb;
+          border-radius: 4px;
+        }
+
+        .inv-sign-line {
+          width: 80%;
+          margin: 35px auto 6px auto;
+          border-top: 1px solid #000;
+        }
+
+        /* PERFECT A4 PRINT */
+        @page {
+          size: A4;
+          margin: 0;
+        }
+
+        @media print {
+          html, body {
+            width: 210mm;
+            height: 297mm;
+          }
+
+          .hide-print {
+            display: none !important;
+          }
+
+          .inv-page {
+            margin: 0;
+          }
+        }
+
+      </style>
+    </head>
+    <body>${printBody}</body>
+  </html>
+  `);
+
+  win.document.close();
+
+  win.onload = () => {
     win.focus();
-    setTimeout(() => win.print(), 300);
+    win.print();
+    win.onafterprint = () => win.close();
   };
+};
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
@@ -326,279 +495,294 @@ export default function InvoiceView({ booking, onClose }: InvoiceViewProps) {
   };
 
   return (
-  <div className="space-y-4">
-    <div className="flex justify-between items-center">
-      <h3 className="text-lg font-bold">
-        Invoice Preview (Tax Exclusive)
-      </h3>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-bold">Invoice Preview (Tax Exclusive)</h3>
 
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant={editing ? "default" : "outline"}
-          onClick={() => setEditing(!editing)}
-        >
-          <Pencil className="h-4 w-4 mr-1" />
-          {editing ? "Done Editing" : "Edit"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={editing ? "default" : "outline"}
+            onClick={() => setEditing(!editing)}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            {editing ? "Done Editing" : "Edit"}
+          </Button>
 
-        <Button size="sm" onClick={handlePrint}>
-          <Printer className="h-4 w-4 mr-1" />
-          Print
-        </Button>
+          <Button size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
 
-        <Button size="sm" variant="outline" onClick={handleDownloadPDF}>
-          <Download className="h-4 w-4 mr-1" />
-          Download
-        </Button>
+          <Button size="sm" variant="outline" onClick={handleDownloadPDF}>
+            <Download className="h-4 w-4 mr-1" />
+            Download
+          </Button>
 
-        <Button size="sm" variant="outline" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-
-    <div className="bg-card border border-border rounded-lg p-6 space-y-6 text-sm">
-
-      {/* HOTEL HEADER */}
-      <div className="text-center border-b border-border pb-4">
-        {editing ? (
-          <Input
-            className="text-center font-bold text-xl"
-            value={hotelName}
-            onChange={(e) => setHotelName(e.target.value)}
-          />
-        ) : (
-          <h1 className="text-2xl font-extrabold text-primary">
-            {hotelName}
-          </h1>
-        )}
-        <p className="text-muted-foreground text-xs uppercase mt-1">
-          {invoiceTitle}
-        </p>
+          <Button size="sm" variant="outline" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* INVOICE META SECTION (PRINT STYLE) */}
-      <table className="w-full text-sm border-b pb-4">
-        <tbody>
-          <tr>
-            <td className="py-1 font-medium text-muted-foreground w-40">
-              Invoice No.
-            </td>
-            <td className="py-1 text-right">
-              {editing ? (
-                <Input
-                  className="w-40 ml-auto text-right"
-                  value={invoiceNumber}
-                  onChange={(e) => setInvoiceNumber(e.target.value)}
-                />
-              ) : (
-                <span className="font-semibold">{invoiceNumber}</span>
-              )}
-            </td>
-          </tr>
+      <div className="bg-card border border-border rounded-lg p-6 space-y-6 text-sm">
+        {/* HOTEL HEADER */}
+        <div className="text-center border-b border-border pb-4">
+          {editing ? (
+            <Input
+              className="text-center font-bold text-xl"
+              value={hotelName}
+              onChange={(e) => setHotelName(e.target.value)}
+            />
+          ) : (
+            <h1 className="text-2xl font-extrabold text-primary">
+              {hotelName}
+            </h1>
+          )}
+          <p className="text-muted-foreground text-xs uppercase mt-1">
+            {invoiceTitle}
+          </p>
+        </div>
 
-          <tr>
-            <td className="py-1 font-medium text-muted-foreground">
-              Check-In
-            </td>
-            <td className="py-1 text-right">
-              {editing ? (
-                <Input
-                  type="datetime-local"
-                  className="w-56 ml-auto text-right"
-                  value={checkInDate}
-                  onChange={(e) => setCheckInDate(e.target.value)}
-                />
-              ) : (
-                formatDateTime(checkInDate)
-              )}
-            </td>
-          </tr>
-
-          <tr>
-            <td className="py-1 font-medium text-muted-foreground">
-              Check-Out
-            </td>
-            <td className="py-1 text-right">
-              {editing ? (
-                <Input
-                  type="datetime-local"
-                  className="w-56 ml-auto text-right"
-                  value={checkOutDate}
-                  onChange={(e) => setCheckOutDate(e.target.value)}
-                />
-              ) : (
-                formatDateTime(checkOutDate)
-              )}
-            </td>
-          </tr>
-
-          <tr>
-            <td className="py-1 font-medium text-muted-foreground">
-              Invoice Date
-            </td>
-            <td className="py-1 text-right">
-              {editing ? (
-                <Input
-                  type="datetime-local"
-                  className="w-56 ml-auto text-right"
-                  value={invoiceDate}
-                  onChange={(e) => setInvoiceDate(e.target.value)}
-                />
-              ) : (
-                formatDateTime(invoiceDate)
-              )}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* DESCRIPTION TABLE */}
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-amber-50">
-            <th className="text-left py-2 px-3 border-b-2 border-amber-200">
-              Description
-            </th>
-            <th className="text-right py-2 px-3 border-b-2 border-amber-200">
-              Amount (Excl. Tax)
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr className="border-b border-border">
-            <td className="py-2.5 px-3">
-              {editing ? (
-                <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              ) : (
-                description
-              )}
-            </td>
-
-            <td className="py-2.5 px-3 text-right">
-              {editing ? (
-                <Input
-                  type="number"
-                  className="w-28 ml-auto text-right"
-                  value={roomBaseAmount}
-                  onChange={(e) => setRoomBaseAmount(e.target.value)}
-                />
-              ) : (
-                <span className="font-medium">
-                  {currency}{roomSubtotal.toFixed(2)}
-                </span>
-              )}
-            </td>
-          </tr>
-
-          {extraItems.map((item, idx) => (
-            <tr key={idx} className="border-b border-border">
-              <td className="py-2 px-3">
+        {/* INVOICE META SECTION (PRINT STYLE) */}
+        <table className="w-full text-sm border-b pb-4">
+          <tbody>
+            <tr>
+              <td className="py-1 font-medium text-muted-foreground w-40">
+                Invoice No.
+              </td>
+              <td className="py-1 text-right">
                 {editing ? (
                   <Input
-                    value={item.desc}
-                    onChange={(e) => {
-                      const n = [...extraItems];
-                      n[idx].desc = e.target.value;
-                      setExtraItems(n);
-                    }}
+                    className="w-40 ml-auto text-right"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
                   />
                 ) : (
-                  item.desc
+                  <span className="font-semibold">{invoiceNumber}</span>
+                )}
+              </td>
+            </tr>
+
+            <tr>
+              <td className="py-1 font-medium text-muted-foreground">
+                Check-In
+              </td>
+              <td className="py-1 text-right">
+                {editing ? (
+                  <Input
+                    type="datetime-local"
+                    className="w-56 ml-auto text-right"
+                    value={checkInDate}
+                    onChange={(e) => setCheckInDate(e.target.value)}
+                  />
+                ) : (
+                  formatDateTime(checkInDate)
+                )}
+              </td>
+            </tr>
+
+            <tr>
+              <td className="py-1 font-medium text-muted-foreground">
+                Check-Out
+              </td>
+              <td className="py-1 text-right">
+                {editing ? (
+                  <Input
+                    type="datetime-local"
+                    className="w-56 ml-auto text-right"
+                    value={checkOutDate}
+                    onChange={(e) => setCheckOutDate(e.target.value)}
+                  />
+                ) : (
+                  formatDateTime(checkOutDate)
+                )}
+              </td>
+            </tr>
+
+            <tr>
+              <td className="py-1 font-medium text-muted-foreground">
+                Invoice Date
+              </td>
+              <td className="py-1 text-right">
+                {editing ? (
+                  <Input
+                    type="datetime-local"
+                    className="w-56 ml-auto text-right"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                  />
+                ) : (
+                  formatDateTime(invoiceDate)
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* DESCRIPTION TABLE */}
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-amber-50">
+              <th className="text-left py-2 px-3 border-b-2 border-amber-200">
+                Description
+              </th>
+              <th className="text-right py-2 px-3 border-b-2 border-amber-200">
+                Amount (Excl. Tax)
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr className="border-b border-border">
+              <td className="py-2.5 px-3">
+                {editing ? (
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                ) : (
+                  description
                 )}
               </td>
 
-              <td className="py-2 px-3 text-right">
+              <td className="py-2.5 px-3 text-right">
                 {editing ? (
                   <Input
                     type="number"
-                    value={item.amount}
-                    onChange={(e) => {
-                      const n = [...extraItems];
-                      n[idx].amount = e.target.value;
-                      setExtraItems(n);
-                    }}
+                    className="w-28 ml-auto text-right"
+                    value={roomBaseAmount}
+                    onChange={(e) => setRoomBaseAmount(e.target.value)}
                   />
                 ) : (
-                  `${currency}${parseFloat(item.amount || "0").toFixed(2)}`
+                  <span className="font-medium">
+                    {currency}
+                    {roomSubtotal.toFixed(2)}
+                  </span>
                 )}
               </td>
             </tr>
-          ))}
 
-          {editing && (
-            <tr>
-              <td colSpan={2} className="py-2 px-3">
-                <Button variant="outline" size="sm" onClick={addExtraItem}>
-                  + Add Line Item
-                </Button>
+            {extraItems.map((item, idx) => (
+              <tr key={idx} className="border-b border-border">
+                <td className="py-2 px-3">
+                  {editing ? (
+                    <Input
+                      value={item.desc}
+                      onChange={(e) => {
+                        const n = [...extraItems];
+                        n[idx].desc = e.target.value;
+                        setExtraItems(n);
+                      }}
+                    />
+                  ) : (
+                    item.desc
+                  )}
+                </td>
+
+                <td className="py-2 px-3 text-right">
+                  {editing ? (
+                    <Input
+                      type="number"
+                      value={item.amount}
+                      onChange={(e) => {
+                        const n = [...extraItems];
+                        n[idx].amount = e.target.value;
+                        setExtraItems(n);
+                      }}
+                    />
+                  ) : (
+                    `${currency}${parseFloat(item.amount || "0").toFixed(2)}`
+                  )}
+                </td>
+              </tr>
+            ))}
+
+            {editing && (
+              <tr>
+                <td colSpan={2} className="py-2 px-3">
+                  <Button variant="outline" size="sm" onClick={addExtraItem}>
+                    + Add Line Item
+                  </Button>
+                </td>
+              </tr>
+            )}
+
+            <tr className="bg-muted/30">
+              <td className="py-2 px-3 font-semibold">Subtotal</td>
+              <td className="py-2 px-3 text-right">
+                {currency}
+                {subtotal.toFixed(2)}
               </td>
             </tr>
-          )}
 
-          <tr className="bg-muted/30">
-            <td className="py-2 px-3 font-semibold">Subtotal</td>
-            <td className="py-2 px-3 text-right">
-              {currency}{subtotal.toFixed(2)}
-            </td>
-          </tr>
+            <tr>
+              <td className="py-2 px-3">
+                {cgstLabel} ({cgstPercent}%)
+              </td>
+              <td className="py-2 px-3 text-right">
+                {currency}
+                {cgstAmount.toFixed(2)}
+              </td>
+            </tr>
 
-          <tr>
-            <td className="py-2 px-3">
-              {cgstLabel} ({cgstPercent}%)
-            </td>
-            <td className="py-2 px-3 text-right">
-              {currency}{cgstAmount.toFixed(2)}
-            </td>
-          </tr>
+            <tr>
+              <td className="py-2 px-3">
+                {sgstLabel} ({sgstPercent}%)
+              </td>
+              <td className="py-2 px-3 text-right">
+                {currency}
+                {sgstAmount.toFixed(2)}
+              </td>
+            </tr>
 
-          <tr>
-            <td className="py-2 px-3">
-              {sgstLabel} ({sgstPercent}%)
-            </td>
-            <td className="py-2 px-3 text-right">
-              {currency}{sgstAmount.toFixed(2)}
-            </td>
-          </tr>
+            <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
+              <td className="py-3 px-3">Total (Incl. Tax)</td>
+              <td className="py-3 px-3 text-right">
+                {currency}
+                {total.toFixed(2)}
+              </td>
+            </tr>
 
-          <tr className="bg-amber-50 font-bold border-b-2 border-amber-200">
-            <td className="py-3 px-3">Total (Incl. Tax)</td>
-            <td className="py-3 px-3 text-right">
-              {currency}{total.toFixed(2)}
-            </td>
-          </tr>
+           <tr>
+  <td className="py-2 px-3">Advance Paid</td>
+  <td className="py-2 px-3 text-right">
+    {editing ? (
+      <Input
+        type="number"
+        className="w-28 ml-auto text-right"
+        value={advancePaid}
+        onChange={(e) => setAdvancePaid(e.target.value)}
+      />
+    ) : (
+      <span>
+        {currency}{parseFloat(advancePaid || "0").toFixed(2)}
+      </span>
+    )}
+  </td>
+</tr>
 
-          <tr>
-            <td className="py-2 px-3">Advance Paid</td>
-            <td className="py-2 px-3 text-right">
-              {currency}{parseFloat(advancePaid).toFixed(2)}
-            </td>
-          </tr>
+            <tr>
+              <td className="py-3 px-3 font-extrabold text-base">
+                Balance Due
+              </td>
+              <td
+                className={`py-3 px-3 text-right font-extrabold text-base ${
+                  balance > 0 ? "text-destructive" : "text-emerald-600"
+                }`}
+              >
+                {currency}
+                {balance.toFixed(2)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-          <tr>
-            <td className="py-3 px-3 font-extrabold text-base">
-              Balance Due
-            </td>
-            <td
-              className={`py-3 px-3 text-right font-extrabold text-base ${
-                balance > 0 ? "text-destructive" : "text-emerald-600"
-              }`}
-            >
-              {currency}{balance.toFixed(2)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      {/* FOOTER */}
-      <div className="text-center text-xs text-muted-foreground border-t pt-3">
-        {invoiceFooter}
+        {/* FOOTER */}
+        <div className="text-center text-xs text-muted-foreground border-t pt-3">
+          {invoiceFooter}
+        </div>
       </div>
     </div>
-  </div>
-)};
+  );
+}

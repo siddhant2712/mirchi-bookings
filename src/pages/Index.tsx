@@ -301,7 +301,7 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Mirchi Hotel
+                Hotel Mirchi
               </h1>
               <p className="text-xs text-muted-foreground">
                 Booking Management

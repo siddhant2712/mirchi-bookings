@@ -65,10 +65,21 @@ export default function SimpleInvoiceGenerator({
 
   const [checkOut, setCheckOut] = useState("");
 
-  const [invoiceNumber, setInvoiceNumber] = useState(
-    "INV-" + Date.now().toString(36).toUpperCase(),
-  );
+  const generateInvoiceNumber = () => {
+  const now = new Date();
 
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const day = pad(now.getDate());
+  const month = pad(now.getMonth() + 1);
+  const year = now.getFullYear().toString().slice(-2);
+  const hours = pad(now.getHours());
+  const minutes = pad(now.getMinutes());
+
+  return `INV-${day}${month}${year}-${hours}${minutes}`;
+};
+
+const [invoiceNumber, setInvoiceNumber] = useState(generateInvoiceNumber());
   const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
   const [gstError, setGstError] = useState("");
@@ -322,18 +333,48 @@ export default function SimpleInvoiceGenerator({
           <div class="inv-invoice-meta">
             <table class="inv-meta-table">
               <tr><td class="meta-label">Invoice No.</td><td class="meta-value">#${invoiceId}</td></tr>
-              <tr><td class="meta-label">Check-In</td><td class="meta-value">${checkIn ? new Date(checkIn).toLocaleDateString("en-IN") : "—"}</td></tr>
-              <tr><td class="meta-label">Check-Out</td><td class="meta-value">${checkOut ? new Date(checkOut).toLocaleDateString("en-IN") : "—"}</td></tr>
+              <tr>
+  <td class="meta-label">Check-In</td>
+  <td class="meta-value">
+    ${
+      checkIn
+        ? new Date(checkIn).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "—"
+    }
+  </td>
+</tr>
+
+<tr>
+  <td class="meta-label">Check-Out</td>
+  <td class="meta-value">
+    ${
+      checkOut
+        ? new Date(checkOut).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "—"
+    }
+  </td>
+</tr>
               <tr>
   <td class="meta-label">Date</td>
   <td class="meta-value">
     ${new Date().toLocaleString("en-IN", {
       day: "2-digit",
       month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
+      year: "numeric"
     })}
   </td>
 </tr></table>
