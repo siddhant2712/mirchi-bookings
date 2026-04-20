@@ -1,73 +1,83 @@
-# Welcome to your Lovable project
+# 🌶️ Hotel Mirchi - Booking Management System
 
-## Project info
+Hotel Mirchi is a premium, high-performance booking management application designed to streamline hotel operations. Built with a modern tech stack, it provides a seamless experience for managing rooms, guests, and revenue.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Hotel Mirchi Banner](https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop)
 
-## How can I edit this code?
+## ✨ Key Features
 
-There are several ways of editing your application.
+- **🏨 Room Management**: Real-time availability tracking with an interactive room grid.
+- **📅 Smart Booking**: Easy-to-use booking form with support for check-ins, check-outs, and guest details.
+- **📊 Advanced Analytics**: Comprehensive revenue dashboard with visual charts and trends.
+- **📑 Invoice Generation**: 
+  - Dynamic PDF invoice generation for guests.
+  - Simple invoice generator for on-the-fly billing.
+  - Export bookings data in JSON format for external processing.
+- **🛠️ Robust Settings**: Fully customizable business details, currency settings, and room configurations.
+- **🌑 Modern UI/UX**: Built with a focus on aesthetics, featuring a responsive design and smooth animations.
 
-**Use Lovable**
+## 🚀 Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **UI Components**: [shadcn/ui](https://ui.shadcn.com/) (Radix UI)
+- **State Management**: [TanStack Query](https://tanstack.com/query/latest)
+- **Form Handling**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
+- **Charts**: [Recharts](https://recharts.org/)
+- **PDF Export**: [jsPDF](https://github.com/parallax/jsPDF) + [AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable)
+- **Date Utilities**: [date-fns](https://date-fns.org/)
 
-Changes made via Lovable will be committed automatically to this repo.
+## 📦 Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Node.js (v18 or higher)
+- npm or bun
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Installation
 
-Follow these steps:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/siddhant2712/mirchi-bookings.git
+   cd mirchi-bookings
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. **Install dependencies**:
+   ```bash
+   npm install
+   # or
+   bun install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. **Start the development server**:
+   ```bash
+   npm run dev
+   # or
+   bun dev
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. **Build for production**:
+   ```bash
+   npm run build
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+## 📂 Project Structure
+
+```text
+src/
+├── components/   # Reusable UI components & business logic modules
+├── hooks/        # Custom React hooks
+├── lib/          # Utilities, types, and data stores
+├── pages/        # Main application views (Dashboard, Bookings, etc.)
+├── types/        # TypeScript interfaces and types
+└── assets/       # Static assets like images and fonts
 ```
 
-**Edit a file directly in GitHub**
+## 🛡️ License
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Made with ❤️ by [Siddhant](https://github.com/siddhant2712)
